@@ -20,6 +20,9 @@ struct SetupView: View {
                 .tabItem { Label("Setup", systemImage: "gearshape") }
         }
         .frame(width: 560, height: 580)
+        .tint(Theme.accent)
+        .preferredColorScheme(.dark)
+        .background(Theme.background)
         .onAppear { model.refresh() }
     }
 }
@@ -80,6 +83,7 @@ private struct PetTab: View {
             }
         }
         .formStyle(.grouped)
+        .scrollContentBackground(.hidden)
     }
 
     @ViewBuilder private var petPreview: some View {
@@ -138,6 +142,7 @@ private struct SetupTab: View {
             }
         }
         .formStyle(.grouped)
+        .scrollContentBackground(.hidden)
     }
 
     private var notificationTitle: String {
