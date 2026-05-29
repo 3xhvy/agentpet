@@ -4,6 +4,8 @@ import AgentPetCore
 
 struct MenuBarContentView: View {
     @ObservedObject private var daemon = AppDaemon.shared
+    @ObservedObject private var pet = PetController.shared
+    @ObservedObject private var petWindow = PetWindowController.shared
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -19,6 +21,20 @@ struct MenuBarContentView: View {
                     SessionRow(session: session)
                 }
             }
+
+            Divider()
+
+            Toggle("Show pet", isOn: $petWindow.isVisible)
+
+            Picker("Pet", selection: Binding(
+                get: { pet.currentPackName },
+                set: { pet.selectPack(named: $0) }
+            )) {
+                ForEach(pet.availablePackNames, id: \.self) { name in
+                    Text(name).tag(name)
+                }
+            }
+            .pickerStyle(.menu)
 
             Divider()
 

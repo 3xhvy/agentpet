@@ -47,5 +47,6 @@ final class AppDaemon: ObservableObject {
 
     private func refresh() {
         sessions = store.sorted
+        PetController.shared.update(sessions: sessions)
     }
 }
