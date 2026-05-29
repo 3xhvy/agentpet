@@ -1,35 +1,78 @@
 import SwiftUI
 import AgentPetCore
 
-/// Native macOS-style settings: a tabbed window of grouped forms.
+/// Native macOS-style settings: a preferences-style toolbar of tabs over
+/// grouped forms (dark).
 struct SetupView: View {
     @ObservedObject private var model = SettingsModel.shared
     @ObservedObject private var pet = PetController.shared
     @ObservedObject private var imagePets = ImagePetStore.shared
     var onClose: () -> Void
 
+    enum Tab { case general, pet }
+    @State private var tab: Tab = .general
+
     private var selectedPack: ImagePetPack? {
         pet.selectedPetID.flatMap { imagePets.pack(id: $0) }
     }
 
     var body: some View {
-        TabView {
-            PetTab(pet: pet, imagePets: imagePets, model: model, selectedPack: selectedPack)
-                .tabItem { Label("Pet", systemImage: "pawprint.fill") }
-            SetupTab(model: model, pet: pet)
-                .tabItem { Label("Setup", systemImage: "gearshape") }
-            GeneralTab()
-                .tabItem { Label("General", systemImage: "info.circle") }
+        VStack(spacing: 0) {
+            tabBar
+            Divider()
+            Group {
+                switch tab {
+                case .general:
+                    GeneralTab(model: model, pet: pet)
+                case .pet:
+                    PetTab(pet: pet, imagePets: imagePets, model: model, selectedPack: selectedPack)
+                }
+            }
         }
-        .frame(width: 560, height: 580)
+        .frame(width: 560, height: 600)
         .preferredColorScheme(.dark)
         .onAppear { model.refresh() }
     }
+
+    private var tabBar: some View {
+        HStack(spacing: 8) {
+            TabButton(icon: "gearshape.fill", label: "General", selected: tab == .general) { tab = .general }
+            TabButton(icon: "pawprint.fill", label: "Pet", selected: tab == .pet) { tab = .pet }
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 10)
+    }
 }
 
-// MARK: - General tab
+private struct TabButton: View {
+    let icon: String
+    let label: String
+    let selected: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            VStack(spacing: 4) {
+                Image(systemName: icon).font(.system(size: 19))
+                Text(label).font(.system(size: 11))
+            }
+            .frame(width: 78, height: 48)
+            .background(RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(selected ? Color.accentColor.opacity(0.22) : .clear))
+            .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .strokeBorder(selected ? Color.accentColor.opacity(0.55) : .clear, lineWidth: 1))
+            .foregroundStyle(selected ? Color.accentColor : Color.primary)
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+// MARK: - General (merged setup + general)
 
 private struct GeneralTab: View {
+    @ObservedObject var model: SettingsModel
+    @ObservedObject var pet: PetController
+
     var body: some View {
         Form {
             Section("Launch") {
@@ -38,6 +81,39 @@ private struct GeneralTab: View {
                         Text("Launch at login")
                         Text("AgentPet starts automatically when you sign in.")
                             .font(.caption).foregroundStyle(.secondary)
+                    }
+                }
+            }
+
+            Section("Notifications") {
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(notificationTitle)
+                        Text(notificationDetail).font(.caption).foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    notificationButton
+                }
+                Toggle("Chat bubble", isOn: $pet.showChat)
+            }
+
+            Section("Agent integrations") {
+                ForEach(model.agents) { agent in
+                    HStack {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(agent.displayName)
+                            if model.isInstalled(agent.kind) && agent.note == nil {
+                                Text("Hook installed").font(.caption).foregroundStyle(.green)
+                            }
+                        }
+                        Spacer()
+                        if agent.isSupported {
+                            Button(model.isInstalled(agent.kind) ? "Remove" : "Install") {
+                                model.toggleInstall(agent.kind)
+                            }
+                        } else {
+                            Text("Coming soon").foregroundStyle(.secondary)
+                        }
                     }
                 }
             }
@@ -57,6 +133,36 @@ private struct GeneralTab: View {
         let v = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.1.0"
         let b = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1"
         return "\(v) (\(b))"
+    }
+
+    private var notificationTitle: String {
+        switch model.notificationState {
+        case .enabled: return "Notifications enabled"
+        case .denied: return "Notifications denied"
+        case .unavailable: return "Notifications unavailable"
+        case .notDetermined: return "Enable notifications"
+        }
+    }
+
+    private var notificationDetail: String {
+        switch model.notificationState {
+        case .unavailable: return "Available once installed as AgentPet.app"
+        case .denied: return "Turn on in System Settings to get alerts"
+        default: return "Alerts when an agent finishes or needs input"
+        }
+    }
+
+    @ViewBuilder private var notificationButton: some View {
+        switch model.notificationState {
+        case .enabled:
+            Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
+        case .denied:
+            Button("Open Settings") { model.openSystemNotificationSettings() }
+        case .notDetermined:
+            Button("Enable") { model.enableNotifications() }
+        case .unavailable:
+            EmptyView()
+        }
     }
 }
 
@@ -123,86 +229,6 @@ private struct PetTab: View {
             ImageSpriteView(frames: pack.clip(0), mood: .idle, size: 78)
         } else {
             Image(systemName: "pawprint.fill").font(.system(size: 40)).foregroundStyle(.secondary)
-        }
-    }
-}
-
-// MARK: - Setup tab
-
-private struct SetupTab: View {
-    @ObservedObject var model: SettingsModel
-    @ObservedObject var pet: PetController
-
-    var body: some View {
-        Form {
-            Section("Notifications") {
-                HStack {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(notificationTitle)
-                        Text(notificationDetail).font(.caption).foregroundStyle(.secondary)
-                    }
-                    Spacer()
-                    notificationButton
-                }
-            }
-
-            Section {
-                Toggle("Show chat bubble", isOn: $pet.showChat)
-            } footer: {
-                Text("Show the pet's speech bubble while it works.")
-            }
-
-            Section("Agent integrations") {
-                ForEach(model.agents) { agent in
-                    HStack {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(agent.displayName)
-                            if model.isInstalled(agent.kind) && agent.note == nil {
-                                Text("Hook installed").font(.caption).foregroundStyle(.green)
-                            }
-                        }
-                        Spacer()
-                        if agent.isSupported {
-                            Button(model.isInstalled(agent.kind) ? "Remove" : "Install") {
-                                model.toggleInstall(agent.kind)
-                            }
-                        } else {
-                            Text("Coming soon").foregroundStyle(.secondary)
-                        }
-                    }
-                }
-            }
-        }
-        .formStyle(.grouped)
-    }
-
-    private var notificationTitle: String {
-        switch model.notificationState {
-        case .enabled: return "Enabled"
-        case .denied: return "Denied"
-        case .unavailable: return "Unavailable"
-        case .notDetermined: return "Not enabled"
-        }
-    }
-
-    private var notificationDetail: String {
-        switch model.notificationState {
-        case .unavailable: return "Available once installed as AgentPet.app"
-        case .denied: return "Turn on in System Settings to get alerts"
-        default: return "Alerts when an agent finishes or needs input"
-        }
-    }
-
-    @ViewBuilder private var notificationButton: some View {
-        switch model.notificationState {
-        case .enabled:
-            Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
-        case .denied:
-            Button("Open Settings") { model.openSystemNotificationSettings() }
-        case .notDetermined:
-            Button("Enable") { model.enableNotifications() }
-        case .unavailable:
-            EmptyView()
         }
     }
 }
