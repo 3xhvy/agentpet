@@ -69,9 +69,20 @@ private struct SessionRow: View {
                     .foregroundStyle(.secondary)
             }
             Spacer()
-            Text(session.updatedAt, style: .relative)
+            timeLabel
                 .font(.caption2)
                 .foregroundStyle(.secondary)
+        }
+    }
+
+    /// Active states count up (how long running/waiting); finished states show a
+    /// fixed finish time so they don't keep ticking.
+    @ViewBuilder private var timeLabel: some View {
+        switch session.state {
+        case .done, .idle:
+            Text(session.updatedAt.formatted(date: .omitted, time: .shortened))
+        default:
+            Text(session.updatedAt, style: .relative)
         }
     }
 

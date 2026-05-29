@@ -5,6 +5,7 @@ import AgentPetCore
 /// to wire up.
 struct SetupView: View {
     @ObservedObject private var model = SettingsModel.shared
+    @ObservedObject private var pet = PetController.shared
     var onClose: () -> Void
 
     var body: some View {
@@ -44,6 +45,20 @@ struct SetupView: View {
                 .padding(4)
             }
 
+            GroupBox {
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("Pet").font(.headline)
+                    HStack(spacing: 12) {
+                        ForEach(model.availablePets) { option in
+                            PetCard(option: option,
+                                    selected: pet.currentPackName == option.name,
+                                    select: { pet.selectPack(named: option.name) })
+                        }
+                    }
+                }
+                .padding(4)
+            }
+
             HStack {
                 Spacer()
                 Button("Done") { onClose() }
@@ -76,6 +91,31 @@ struct SetupView: View {
         case .unavailable:
             Text("Unavailable").foregroundStyle(.secondary)
         }
+    }
+}
+
+private struct PetCard: View {
+    let option: SettingsModel.PetOption
+    let selected: Bool
+    let select: () -> Void
+
+    var body: some View {
+        Button(action: select) {
+            VStack(spacing: 6) {
+                Text(option.preview).font(.system(size: 34))
+                Text(option.name).font(.caption)
+            }
+            .frame(width: 76, height: 76)
+            .background(
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(selected ? Color.accentColor.opacity(0.18) : Color.secondary.opacity(0.08))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 10)
+                    .strokeBorder(selected ? Color.accentColor : .clear, lineWidth: 2)
+            )
+        }
+        .buttonStyle(.plain)
     }
 }
 

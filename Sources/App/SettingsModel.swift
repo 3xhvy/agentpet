@@ -16,10 +16,22 @@ final class SettingsModel: ObservableObject {
         case denied
     }
 
+    struct PetOption: Identifiable, Equatable {
+        let name: String
+        let preview: String
+        var id: String { name }
+    }
+
     @Published private(set) var notificationState: NotificationState = .notDetermined
     @Published private(set) var claudeInstalled = false
 
     let agents = AgentCatalog.all
+
+    var availablePets: [PetOption] {
+        PetPackLoader.loadBuiltins().map {
+            PetOption(name: $0.name, preview: $0.animation(for: .idle).frames.first ?? "🐾")
+        }
+    }
 
     func refresh() {
         claudeInstalled = ClaudeHookInstaller.isInstalledOnDisk()
