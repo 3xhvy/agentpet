@@ -9,12 +9,16 @@ struct SetupView: View {
     @ObservedObject private var imagePets = ImagePetStore.shared
     var onClose: () -> Void
 
+    private var selectedPack: ImagePetPack? {
+        pet.selectedPetID.flatMap { imagePets.pack(id: $0) }
+    }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 26) {
                 header
                 hero
-                if case .imported(let id) = pet.selection, let pack = imagePets.pack(id: id) {
+                if let pack = selectedPack {
                     animationsSection(pack)
                 }
                 setupSection
@@ -48,22 +52,20 @@ struct SetupView: View {
         }
     }
 
-    // MARK: - Hero (preview + details)
+    // MARK: - Hero
 
     private var hero: some View {
         HStack(alignment: .top, spacing: 24) {
             previewCard
             VStack(alignment: .leading, spacing: 14) {
                 EyebrowLabel("Your pet")
-                Text(petTitle)
+                Text(selectedPack?.displayName ?? "No pet yet")
                     .font(.system(size: 34, weight: .bold))
                     .foregroundStyle(.white)
-                if let desc = petDescription {
-                    Text(desc)
-                        .font(.system(size: 14))
-                        .foregroundStyle(.white.opacity(0.72))
-                        .fixedSize(horizontal: false, vertical: true)
-                }
+                Text(selectedPack?.description ?? "Import a pet pack to bring a companion to your desktop.")
+                    .font(.system(size: 14))
+                    .foregroundStyle(.white.opacity(0.72))
+                    .fixedSize(horizontal: false, vertical: true)
                 petChooser
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -76,31 +78,32 @@ struct SetupView: View {
                 .fill(.white.opacity(0.04))
                 .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous).strokeBorder(Theme.accent.opacity(0.35), lineWidth: 1))
                 .shadow(color: Theme.accent.opacity(0.35), radius: 24, y: 8)
-            petPreview(size: 150)
+            if let pack = selectedPack {
+                ImageSpriteView(frames: pack.clip(0), mood: .idle, size: 150)
+            } else {
+                Image(systemName: "pawprint.fill").font(.system(size: 60)).foregroundStyle(.white.opacity(0.3))
+            }
         }
         .frame(width: 220, height: 220)
     }
 
     private var petChooser: some View {
         VStack(alignment: .leading, spacing: 10) {
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 12) {
-                    ForEach(PetKind.allCases) { kind in
-                        PetCard(selection: .builtin(kind), title: kind.displayName,
-                                selected: pet.selection == .builtin(kind),
-                                select: { pet.selection = .builtin(kind) })
+            if imagePets.packs.isEmpty {
+                Text("No pets imported yet.").font(.system(size: 13)).foregroundStyle(.white.opacity(0.55))
+            } else {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 12) {
+                        ForEach(imagePets.packs) { pack in
+                            PetCard(id: pack.id, title: pack.displayName,
+                                    selected: pet.selectedPetID == pack.id,
+                                    select: { pet.selectedPetID = pack.id })
+                        }
                     }
-                    ForEach(imagePets.packs) { pack in
-                        PetCard(selection: .imported(pack.id), title: pack.displayName,
-                                selected: pet.selection == .imported(pack.id),
-                                select: { pet.selection = .imported(pack.id) })
-                    }
+                    .padding(.vertical, 2)
                 }
-                .padding(.vertical, 2)
             }
-            Button {
-                model.importPet()
-            } label: {
+            Button { model.importPet() } label: {
                 Label("Import pet…", systemImage: "square.and.arrow.down")
                     .font(.system(size: 13, weight: .medium))
             }
@@ -123,7 +126,7 @@ struct SetupView: View {
         .themedCard()
     }
 
-    // MARK: - Setup (notifications + agents)
+    // MARK: - Setup
 
     private var setupSection: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -137,6 +140,16 @@ struct SetupView: View {
                 Spacer()
                 notificationButton
             }
+
+            Divider().overlay(Theme.cardStroke)
+
+            Toggle(isOn: $pet.showChat) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Chat bubble").font(.system(size: 14, weight: .semibold)).foregroundStyle(.white)
+                    Text("Show the pet's speech bubble while it works").font(.system(size: 12)).foregroundStyle(.white.opacity(0.6))
+                }
+            }
+            .tint(Theme.accent)
 
             Divider().overlay(Theme.cardStroke)
 
@@ -171,33 +184,6 @@ struct SetupView: View {
             Button("Enable") { model.enableNotifications() }.buttonStyle(.borderedProminent).tint(Theme.accent)
         case .unavailable:
             Text("Unavailable").foregroundStyle(.white.opacity(0.5)).font(.system(size: 13))
-        }
-    }
-
-    // MARK: - Pet preview helpers
-
-    private var petTitle: String {
-        switch pet.selection {
-        case .builtin(let kind): return kind.displayName
-        case .imported(let id): return imagePets.pack(id: id)?.displayName ?? "Pet"
-        }
-    }
-
-    private var petDescription: String? {
-        if case .imported(let id) = pet.selection { return imagePets.pack(id: id)?.description }
-        return nil
-    }
-
-    @ViewBuilder private func petPreview(size: CGFloat) -> some View {
-        switch pet.selection {
-        case .builtin(let kind):
-            PetSpriteView(kind: kind, mood: .idle, size: size)
-        case .imported(let id):
-            if let pack = imagePets.pack(id: id) {
-                ImageSpriteView(frames: pack.clip(0), mood: .idle, size: size)
-            } else {
-                PetSpriteView(kind: .blob, mood: .idle, size: size)
-            }
         }
     }
 }
@@ -238,7 +224,7 @@ private struct AnimationBindingRow: View {
 }
 
 private struct PetCard: View {
-    let selection: PetSelection
+    let id: String
     let title: String
     let selected: Bool
     let select: () -> Void
@@ -246,7 +232,14 @@ private struct PetCard: View {
     var body: some View {
         Button(action: select) {
             VStack(spacing: 4) {
-                preview.frame(width: 60, height: 54)
+                Group {
+                    if let pack = ImagePetStore.shared.pack(id: id) {
+                        ImageSpriteView(frames: pack.clip(0), mood: .idle, size: 56)
+                    } else {
+                        Image(systemName: "pawprint").foregroundStyle(.white)
+                    }
+                }
+                .frame(width: 60, height: 54)
                 Text(title).font(.system(size: 11)).foregroundStyle(.white.opacity(0.85)).lineLimit(1)
             }
             .frame(width: 84, height: 86)
@@ -256,19 +249,6 @@ private struct PetCard: View {
                 .strokeBorder(selected ? Theme.accent : Theme.cardStroke, lineWidth: selected ? 2 : 1))
         }
         .buttonStyle(.plain)
-    }
-
-    @ViewBuilder private var preview: some View {
-        switch selection {
-        case .builtin(let kind):
-            PetSpriteView(kind: kind, mood: .idle, size: 56)
-        case .imported(let id):
-            if let pack = ImagePetStore.shared.pack(id: id) {
-                ImageSpriteView(frames: pack.clip(0), mood: .idle, size: 56)
-            } else {
-                Image(systemName: "pawprint").foregroundStyle(.white)
-            }
-        }
     }
 }
 
@@ -289,8 +269,7 @@ private struct AgentRow: View {
             }
             Spacer()
             if agent.isSupported {
-                Button(installed ? "Remove" : "Install") { toggle() }
-                    .tint(Theme.accent)
+                Button(installed ? "Remove" : "Install") { toggle() }.tint(Theme.accent)
             } else {
                 Text("Coming soon").font(.caption).foregroundStyle(.white.opacity(0.45))
             }

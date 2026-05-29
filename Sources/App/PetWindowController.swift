@@ -15,7 +15,7 @@ final class PetWindowController: ObservableObject {
 
     func start() {
         let panel = NSPanel(
-            contentRect: NSRect(x: 0, y: 0, width: 120, height: 120),
+            contentRect: NSRect(x: 0, y: 0, width: 220, height: 180),
             styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,
             defer: false
@@ -25,12 +25,13 @@ final class PetWindowController: ObservableObject {
         panel.backgroundColor = .clear
         panel.hasShadow = false
         panel.isMovableByWindowBackground = true
+        panel.becomesKeyOnlyIfNeeded = true
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
-        panel.contentView = NSHostingView(rootView: PetView())
+        panel.contentView = NSHostingView(rootView: FloatingPetView())
 
         if let screen = NSScreen.main {
             let frame = screen.visibleFrame
-            panel.setFrameOrigin(NSPoint(x: frame.maxX - 140, y: frame.minY + 40))
+            panel.setFrameOrigin(NSPoint(x: frame.maxX - 236, y: frame.minY + 30))
         }
 
         self.panel = panel

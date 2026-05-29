@@ -52,7 +52,7 @@ final class SettingsModel: ObservableObject {
         panel.message = "Choose a pet folder (with pet.json) or a .zip"
         guard panel.runModal() == .OK, let url = panel.url else { return }
         if let id = ImagePetStore.shared.importPack(from: url) {
-            PetController.shared.selection = .imported(id)
+            PetController.shared.selectedPetID = id
         }
     }
 

@@ -18,6 +18,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
         ImagePetStore.shared.reload()
+        if PetController.shared.selectedPetID == nil {
+            PetController.shared.selectedPetID = ImagePetStore.shared.packs.first?.id
+        }
         PetController.shared.start()
         PetWindowController.shared.start()
         AppDaemon.shared.start()

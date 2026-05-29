@@ -1,57 +1,45 @@
 import Foundation
 import AgentPetCore
 
-/// The chosen pet: a built-in vector pet or an imported spritesheet pack.
-enum PetSelection: Equatable {
-    case builtin(PetKind)
-    case imported(String)   // image pack id
-
-    var storageString: String {
-        switch self {
-        case .builtin(let kind): return "builtin:\(kind.rawValue)"
-        case .imported(let id): return "imported:\(id)"
-        }
-    }
-
-    init?(storageString: String) {
-        let parts = storageString.split(separator: ":", maxSplits: 1).map(String.init)
-        guard parts.count == 2 else { return nil }
-        switch parts[0] {
-        case "builtin":
-            guard let kind = PetKind(rawValue: parts[1]) else { return nil }
-            self = .builtin(kind)
-        case "imported":
-            self = .imported(parts[1])
-        default:
-            return nil
-        }
-    }
-}
-
-/// Resolves the aggregate session mood for the pet and plays a short
-/// `celebrate` burst when work just finished. Also owns the selected pet.
+/// Resolves the aggregate session mood, plays a short `celebrate` burst when
+/// work finishes, owns the selected (imported) pet, and drives the chat bubble.
 @MainActor
 final class PetController: ObservableObject {
     static let shared = PetController()
 
     @Published private(set) var mood: PetMood = .idle
-    @Published var selection: PetSelection {
-        didSet { UserDefaults.standard.set(selection.storageString, forKey: Self.selectionKey) }
+    @Published private(set) var chatLine: String = ""
+
+    @Published var selectedPetID: String? {
+        didSet { UserDefaults.standard.set(selectedPetID, forKey: Self.petKey) }
+    }
+    @Published var showChat: Bool {
+        didSet {
+            UserDefaults.standard.set(showChat, forKey: Self.chatKey)
+            refreshChat()
+        }
     }
 
     private var lastResolved: PetMood = .idle
     private var latestSessions: [AgentSession] = []
     private var celebrateTimer: Timer?
+    private var chatTimer: Timer?
 
-    private static let selectionKey = "agentpet.petSelection"
+    private static let petKey = "agentpet.selectedPetID"
+    private static let chatKey = "agentpet.showChat"
     private static let celebrateDuration: TimeInterval = 3
 
     init() {
-        let saved = UserDefaults.standard.string(forKey: Self.selectionKey)
-        selection = saved.flatMap(PetSelection.init(storageString:)) ?? .builtin(.blob)
+        selectedPetID = UserDefaults.standard.string(forKey: Self.petKey)
+        showChat = (UserDefaults.standard.object(forKey: Self.chatKey) as? Bool) ?? true
     }
 
-    func start() {}
+    func start() {
+        // Vary the chat line periodically while the pet is active.
+        chatTimer = Timer.scheduledTimer(withTimeInterval: 5, repeats: true) { _ in
+            Task { @MainActor [weak self] in self?.refreshChat() }
+        }
+    }
 
     /// Called by the daemon whenever the session list changes.
     func update(sessions: [AgentSession]) {
@@ -60,7 +48,7 @@ final class PetController: ObservableObject {
         defer { lastResolved = resolved }
 
         if resolved == .done && lastResolved != .done {
-            mood = .celebrate
+            setMood(.celebrate)
             celebrateTimer?.invalidate()
             celebrateTimer = Timer.scheduledTimer(withTimeInterval: Self.celebrateDuration, repeats: false) { _ in
                 Task { @MainActor [weak self] in self?.settleAfterCelebrate() }
@@ -71,10 +59,45 @@ final class PetController: ObservableObject {
             return  // let the celebration finish
         }
         celebrateTimer?.invalidate()
-        mood = resolved
+        setMood(resolved)
     }
 
     private func settleAfterCelebrate() {
-        mood = MoodResolver.aggregate(latestSessions)
+        setMood(MoodResolver.aggregate(latestSessions))
     }
+
+    private func setMood(_ newMood: PetMood) {
+        mood = newMood
+        refreshChat()
+    }
+
+    private func refreshChat() {
+        guard showChat, mood != .idle, let pool = PetChat.lines[mood], !pool.isEmpty else {
+            chatLine = ""
+            return
+        }
+        chatLine = pool.randomElement() ?? ""
+    }
+}
+
+/// Randomised chat lines the pet says per mood.
+enum PetChat {
+    static let lines: [PetMood: [String]] = [
+        .working: [
+            "Thinking…", "Working on it…", "On it!", "Crunching code…",
+            "Hmm, let me see…", "Cooking something up…", "Deep in thought…",
+            "Brain go brrr…", "Almost there…", "Wiring it up…",
+        ],
+        .waiting: [
+            "I need you!", "Your turn 👀", "Waiting on you…", "Can you check this?",
+            "Psst, need input!", "Awaiting orders…", "Help me out?", "Stuck, need you!",
+        ],
+        .done: [
+            "All done! ✅", "Finished!", "Ta-da!", "Done and dusted!",
+            "Nailed it!", "That's a wrap!", "Mission complete!",
+        ],
+        .celebrate: [
+            "🎉 Woohoo!", "We did it!", "Victory!", "Yesss!", "High five! 🙌", "Champion!",
+        ],
+    ]
 }
