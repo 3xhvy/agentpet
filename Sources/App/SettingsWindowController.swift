@@ -13,26 +13,26 @@ final class SettingsWindowController {
         SettingsModel.shared.refresh()
 
         if let window {
-            window.orderFrontRegardless()
+            window.makeKeyAndOrderFront(nil)
             return
         }
 
         let hosting = NSHostingController(rootView: SetupView(onClose: { [weak self] in
             self?.window?.close()
         }))
-        // A non-activating, floating panel: shows on top and stays interactive
-        // without stealing focus from the app the user is working in.
+        // A non-activating panel: it can become key so its controls respond on
+        // the first click, without activating the whole app (which would pull
+        // the user out of the window they were working in).
         let panel = NSPanel(contentViewController: hosting)
         panel.styleMask = [.titled, .closable, .nonactivatingPanel]
         panel.title = "AgentPet"
         panel.isFloatingPanel = false
         panel.hidesOnDeactivate = false
-        panel.becomesKeyOnlyIfNeeded = true
         panel.isReleasedWhenClosed = false
         panel.center()
         self.window = panel
 
-        panel.orderFrontRegardless()
+        panel.makeKeyAndOrderFront(nil)
     }
 
     /// Shows onboarding only the first time the app is ever launched.
