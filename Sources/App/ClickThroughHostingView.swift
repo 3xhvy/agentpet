@@ -7,3 +7,14 @@ import SwiftUI
 final class ClickThroughHostingView<Content: View>: NSHostingView<Content> {
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 }
+
+extension View {
+    /// Removes the blue keyboard focus ring from controls within.
+    @ViewBuilder func noFocusRing() -> some View {
+        if #available(macOS 14.0, *) {
+            self.focusEffectDisabled()
+        } else {
+            self
+        }
+    }
+}

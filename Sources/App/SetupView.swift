@@ -31,6 +31,7 @@ struct SetupView: View {
         }
         .frame(width: 560, height: 600)
         .preferredColorScheme(.dark)
+        .noFocusRing()
         .onAppear { model.refresh() }
     }
 

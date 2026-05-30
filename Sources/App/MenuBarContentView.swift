@@ -25,6 +25,7 @@ struct MenuContentView: View {
         }
         .frame(width: 300)
         .environment(\.colorScheme, .dark)
+        .noFocusRing()
     }
 
     private var card: some View {
