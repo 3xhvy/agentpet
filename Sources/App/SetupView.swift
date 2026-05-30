@@ -116,15 +116,11 @@ private struct GeneralTab: View {
                     ForEach(ChatSettings.editableMoods, id: \.self) { mood in
                         VStack(alignment: .leading, spacing: 4) {
                             Text(moodLabel(mood)).font(.caption).foregroundStyle(.secondary)
-                            TextEditor(text: Binding(
+                            GrowingTextEditor(text: Binding(
                                 get: { chat.text(for: mood) },
                                 set: { chat.setText($0, for: mood) }
                             ))
-                            .font(.callout)
-                            .multilineTextAlignment(.leading)
-                            .scrollContentBackground(.hidden)
-                            .frame(height: 78)
-                            .padding(6)
+                            .padding(4)
                             .background(RoundedRectangle(cornerRadius: 6).fill(Color(white: 0.16)))
                             .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(.white.opacity(0.12)))
                             .frame(maxWidth: .infinity, alignment: .leading)
