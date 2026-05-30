@@ -12,10 +12,10 @@ final class SettingsWindowController {
     func show() {
         SettingsModel.shared.refresh()
 
-        if let window {
-            window.orderFrontRegardless()
-            return
-        }
+        // Always rebuild so the window opens fresh (default tab, scrolled to top)
+        // instead of restoring the previous session's state.
+        window?.close()
+        window = nil
 
         // Non-activating panel + click-through hosting view: controls respond on
         // the first click without the window ever becoming key, so the user's

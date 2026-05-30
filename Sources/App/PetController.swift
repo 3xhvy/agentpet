@@ -58,6 +58,31 @@ final class PetController: ObservableObject {
         }
     }
 
+    private var sizeAnimTimer: Timer?
+
+    /// Eases `petPoint` to a target so a preset tap resizes as smoothly as a
+    /// slider drag (each step drives the same smooth window resize).
+    func animateSize(to target: Double) {
+        sizeAnimTimer?.invalidate()
+        let clamped = min(max(target, Self.minPoint), Self.maxPoint)
+        let start = petPoint
+        let steps = 14
+        var i = 0
+        sizeAnimTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 60.0, repeats: true) { _ in
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                i += 1
+                let t = min(Double(i) / Double(steps), 1)
+                let eased = t * t * (3 - 2 * t)   // smoothstep
+                self.petPoint = start + (clamped - start) * eased
+                if i >= steps {
+                    self.petPoint = clamped
+                    self.sizeAnimTimer?.invalidate()
+                }
+            }
+        }
+    }
+
     /// Called by the daemon whenever the session list changes.
     func update(sessions: [AgentSession]) {
         latestSessions = sessions

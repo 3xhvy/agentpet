@@ -261,7 +261,7 @@ private struct PetTab: View {
                 }
                 HStack {
                     ForEach(PetController.presets, id: \.0) { preset in
-                        Button(preset.0) { pet.petPoint = preset.1 }
+                        Button(preset.0) { pet.animateSize(to: preset.1) }
                             .buttonStyle(.bordered)
                     }
                     Spacer()
