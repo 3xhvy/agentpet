@@ -24,7 +24,7 @@ Running multiple agents in parallel means constantly switching windows to check 
 - **At-a-glance menu bar icon**: shows the number of running agents, and turns **orange with a count** when one needs your input.
 - **Desktop pet** that reacts to the aggregate state (working / waiting / done / celebrate), with an optional **chat bubble** (built-in or fully custom messages).
 - **Native notifications** when an agent finishes or needs input.
-- **Claude Code integration** via hooks, with one-tap install from Settings (precise working / waiting / done / idle states).
+- **Claude Code, Codex & Gemini CLI** integration via hooks, with one-tap install from Settings (precise working / waiting / done / idle, including "needs your input").
 - **Universal wrapper** `agentpet run -- <command>` to monitor *any* CLI agent (working/done), no per-agent setup.
 - **Pet system**: import pet packs (pet.json + spritesheet), browse an online pet library, map each animation to a state, resize, and customise chat lines.
 - **Polished, native Settings** (tabbed, dark) that never steals focus.
@@ -66,7 +66,6 @@ AgentPet does not bundle any pet art; packs are added at runtime by you.
 
 ## Roadmap
 
-- Codex / Gemini CLI adapters (native "waiting" detection)
 - Notarized DMG + Homebrew cask
 - Click an agent to reveal its terminal
 - Per-project pets
