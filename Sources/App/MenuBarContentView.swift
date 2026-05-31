@@ -7,6 +7,7 @@ import AgentPetCore
 struct MenuContentView: View {
     @ObservedObject private var daemon = AppDaemon.shared
     @ObservedObject private var petWindow = PetWindowController.shared
+    @ObservedObject private var statusBar = StatusBarController.shared
     var dismiss: () -> Void
 
     /// Idle sessions are historical/quiet; show only active or just-finished ones.
@@ -84,13 +85,20 @@ struct MenuContentView: View {
     // MARK: Controls
 
     private var controls: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "pawprint").foregroundStyle(.white.opacity(0.8))
-            Text("Show pet").font(.system(size: 13)).foregroundStyle(.white)
-            Spacer()
-            ColorSwitch(isOn: $petWindow.isVisible)
+        VStack(spacing: 0) {
+            controlRow(icon: "pawprint", label: "Show pet", isOn: $petWindow.isVisible)
+            controlRow(icon: "number", label: "Show count on menu bar", isOn: $statusBar.showCount)
         }
-        .padding(.horizontal, 14).padding(.vertical, 9)
+    }
+
+    private func controlRow(icon: String, label: String, isOn: Binding<Bool>) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: icon).foregroundStyle(.white.opacity(0.8)).frame(width: 16)
+            Text(label).font(.system(size: 13)).foregroundStyle(.white)
+            Spacer()
+            ColorSwitch(isOn: isOn)
+        }
+        .padding(.horizontal, 14).padding(.vertical, 8)
     }
 
     // MARK: Footer
