@@ -4,11 +4,14 @@ import Foundation
 /// CLI helper invoked by agent hooks: `agentpet hook --event ... --session ...`.
 enum HookCLI {
     static func run(arguments: [String]) -> Never {
-        // Explicit flags win; otherwise fall back to a Claude Code hook payload
-        // on stdin, so the installed hook can simply call `agentpet hook`.
+        // Explicit flags win; otherwise fall back to a hook payload on stdin
+        // (Claude/Codex/Gemini share the same field names). `--agent` selects
+        // which agent's event names to map.
         let now = Date()
-        let event = HookArguments.parse(arguments).makeEvent(now: now)
-            ?? ClaudeHookPayload.decode(from: FileHandle.standardInput.readDataToEndOfFile())?.makeEvent(now: now)
+        let parsed = HookArguments.parse(arguments)
+        let kind = parsed.agent.flatMap(AgentKind.init(rawValue:)) ?? .claude
+        let event = parsed.makeEvent(now: now)
+            ?? ClaudeHookPayload.decode(from: FileHandle.standardInput.readDataToEndOfFile())?.makeEvent(now: now, kind: kind)
 
         guard let event else {
             FileHandle.standardError.write(Data(

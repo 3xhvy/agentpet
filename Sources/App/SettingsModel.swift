@@ -17,29 +17,39 @@ final class SettingsModel: ObservableObject {
     }
 
     @Published private(set) var notificationState: NotificationState = .notDetermined
-    @Published private(set) var claudeInstalled = false
+    @Published private(set) var installedKinds: Set<AgentKind> = []
 
     let agents = AgentCatalog.all
 
     func refresh() {
-        claudeInstalled = ClaudeHookInstaller.isInstalledOnDisk()
+        var set: Set<AgentKind> = []
+        for agent in agents where agent.isSupported {
+            if let spec = AgentHooks.spec(for: agent.kind),
+               ClaudeHookInstaller.isInstalledOnDisk(path: spec.settingsPath, events: spec.events) {
+                set.insert(agent.kind)
+            }
+        }
+        installedKinds = set
         refreshNotificationState()
     }
 
     func isInstalled(_ kind: AgentKind) -> Bool {
-        kind == .claude ? claudeInstalled : false
+        installedKinds.contains(kind)
+    }
+
+    private func hookCommand(for kind: AgentKind) -> String {
+        let path = Bundle.main.executablePath ?? CommandLine.arguments.first ?? "agentpet"
+        return "\"\(path)\" hook --agent \(kind.rawValue)"
     }
 
     func toggleInstall(_ kind: AgentKind) {
-        guard kind == .claude else { return }
-        if claudeInstalled {
-            try? ClaudeHookInstaller.uninstallFromDisk()
-            AppDaemon.shared.clearSessions()
+        guard let spec = AgentHooks.spec(for: kind) else { return }
+        if installedKinds.contains(kind) {
+            try? ClaudeHookInstaller.uninstallFromDisk(path: spec.settingsPath, events: spec.events)
         } else {
-            let path = Bundle.main.executablePath ?? CommandLine.arguments.first ?? "agentpet"
-            try? ClaudeHookInstaller.installToDisk(command: "\"\(path)\" hook")
+            try? ClaudeHookInstaller.installToDisk(command: hookCommand(for: kind), path: spec.settingsPath, events: spec.events)
         }
-        claudeInstalled = ClaudeHookInstaller.isInstalledOnDisk()
+        refresh()
     }
 
     /// Prompts for a pet folder or .zip, imports it, and selects it.

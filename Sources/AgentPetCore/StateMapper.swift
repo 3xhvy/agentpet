@@ -13,19 +13,29 @@ public enum StateMapper {
         switch kind {
         case .claude:
             switch eventName {
-            case "SessionStart":
-                return .registered
-            case "UserPromptSubmit", "PreToolUse", "PostToolUse":
-                return .working
-            case "Notification":
-                return .waiting
-            case "Stop", "SubagentStop":
-                return .done
-            default:
-                return nil
+            case "SessionStart": return .registered
+            case "UserPromptSubmit", "PreToolUse", "PostToolUse": return .working
+            case "Notification": return .waiting
+            case "Stop", "SubagentStop": return .done
+            default: return nil
             }
-        case .codex, .gemini, .cli, .unknown:
-            // v2: Codex/Gemini mappings added when their hook support lands.
+        case .codex:
+            switch eventName {
+            case "SessionStart": return .registered
+            case "UserPromptSubmit", "PreToolUse", "PostToolUse", "SubagentStart": return .working
+            case "PermissionRequest": return .waiting
+            case "Stop", "SubagentStop": return .done
+            default: return nil
+            }
+        case .gemini:
+            switch eventName {
+            case "SessionStart": return .registered
+            case "BeforeAgent", "BeforeModel", "BeforeTool", "AfterTool", "BeforeToolSelection", "AfterModel": return .working
+            case "Notification": return .waiting
+            case "AfterAgent", "SessionEnd": return .done
+            default: return nil
+            }
+        case .cli, .unknown:
             return nil
         }
     }

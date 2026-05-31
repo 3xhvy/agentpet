@@ -21,7 +21,7 @@ public struct AgentIntegration: Identifiable, Sendable, Equatable {
 public enum AgentCatalog {
     public static let all: [AgentIntegration] = [
         AgentIntegration(kind: .claude, displayName: "Claude Code", isSupported: true),
-        AgentIntegration(kind: .codex, displayName: "Codex", isSupported: false, note: "Coming soon"),
-        AgentIntegration(kind: .gemini, displayName: "Gemini CLI", isSupported: false, note: "Coming soon"),
+        AgentIntegration(kind: .codex, displayName: "Codex", isSupported: true),
+        AgentIntegration(kind: .gemini, displayName: "Gemini CLI", isSupported: true),
     ]
 }

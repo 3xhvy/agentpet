@@ -21,7 +21,7 @@ public enum ClaudeHookInstaller {
         command.contains("agentpet") && command.contains("hook")
     }
 
-    public static func isInstalled(in settings: [String: Any]) -> Bool {
+    public static func isInstalled(in settings: [String: Any], events: [String] = events) -> Bool {
         guard let hooks = settings["hooks"] as? [String: Any] else { return false }
         for event in events {
             guard let groups = hooks[event] as? [[String: Any]] else { continue }
@@ -30,7 +30,7 @@ public enum ClaudeHookInstaller {
         return false
     }
 
-    public static func install(into settings: [String: Any], command: String) -> [String: Any] {
+    public static func install(into settings: [String: Any], command: String, events: [String] = events) -> [String: Any] {
         var settings = settings
         var hooks = settings["hooks"] as? [String: Any] ?? [:]
         for event in events {
@@ -42,7 +42,7 @@ public enum ClaudeHookInstaller {
         return settings
     }
 
-    public static func uninstall(from settings: [String: Any]) -> [String: Any] {
+    public static func uninstall(from settings: [String: Any], events: [String] = events) -> [String: Any] {
         var settings = settings
         guard var hooks = settings["hooks"] as? [String: Any] else { return settings }
         for event in events {
@@ -75,15 +75,15 @@ public enum ClaudeHookInstaller {
         try data.write(to: URL(fileURLWithPath: path))
     }
 
-    public static func installToDisk(command: String, path: String = defaultSettingsPath()) throws {
-        try writeSettings(install(into: readSettings(path: path), command: command), path: path)
+    public static func installToDisk(command: String, path: String = defaultSettingsPath(), events: [String] = events) throws {
+        try writeSettings(install(into: readSettings(path: path), command: command, events: events), path: path)
     }
 
-    public static func uninstallFromDisk(path: String = defaultSettingsPath()) throws {
-        try writeSettings(uninstall(from: readSettings(path: path)), path: path)
+    public static func uninstallFromDisk(path: String = defaultSettingsPath(), events: [String] = events) throws {
+        try writeSettings(uninstall(from: readSettings(path: path), events: events), path: path)
     }
 
-    public static func isInstalledOnDisk(path: String = defaultSettingsPath()) -> Bool {
-        isInstalled(in: readSettings(path: path))
+    public static func isInstalledOnDisk(path: String = defaultSettingsPath(), events: [String] = events) -> Bool {
+        isInstalled(in: readSettings(path: path), events: events)
     }
 }

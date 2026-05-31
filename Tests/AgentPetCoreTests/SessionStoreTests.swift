@@ -14,13 +14,37 @@ final class StateMapperTests: XCTestCase {
 
     func testUnknownEventIsIgnored() {
         XCTAssertNil(StateMapper.state(for: .claude, eventName: "Bogus"))
-        XCTAssertNil(StateMapper.state(for: .codex, eventName: "Stop"))
+        XCTAssertNil(StateMapper.state(for: .codex, eventName: "Bogus"))
+        XCTAssertNil(StateMapper.state(for: .unknown, eventName: "Stop"))
     }
 
     func testDirectStateNameMapsForAnyKind() {
         XCTAssertEqual(StateMapper.state(for: .cli, eventName: "working"), .working)
         XCTAssertEqual(StateMapper.state(for: .cli, eventName: "done"), .done)
         XCTAssertEqual(StateMapper.state(for: .unknown, eventName: "waiting"), .waiting)
+    }
+
+    func testCodexMapping() {
+        XCTAssertEqual(StateMapper.state(for: .codex, eventName: "SessionStart"), .registered)
+        XCTAssertEqual(StateMapper.state(for: .codex, eventName: "PreToolUse"), .working)
+        XCTAssertEqual(StateMapper.state(for: .codex, eventName: "PermissionRequest"), .waiting)
+        XCTAssertEqual(StateMapper.state(for: .codex, eventName: "Stop"), .done)
+    }
+
+    func testGeminiMapping() {
+        XCTAssertEqual(StateMapper.state(for: .gemini, eventName: "BeforeTool"), .working)
+        XCTAssertEqual(StateMapper.state(for: .gemini, eventName: "Notification"), .waiting)
+        XCTAssertEqual(StateMapper.state(for: .gemini, eventName: "AfterAgent"), .done)
+    }
+
+    func testHookSpecsCoverInstallEvents() {
+        // Every event we register must map to a state for that agent.
+        for kind in [AgentKind.claude, .codex, .gemini] {
+            let spec = AgentHooks.spec(for: kind)!
+            for event in spec.events {
+                XCTAssertNotNil(StateMapper.state(for: kind, eventName: event), "\(kind) \(event)")
+            }
+        }
     }
 }
 

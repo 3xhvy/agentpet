@@ -23,12 +23,12 @@ public struct ClaudeHookPayload: Decodable, Equatable {
 
     /// Builds an `AgentEvent` from the payload, or `nil` if the essential
     /// fields (session id and event name) are missing.
-    public func makeEvent(now: Date) -> AgentEvent? {
+    public func makeEvent(now: Date, kind: AgentKind = .claude) -> AgentEvent? {
         guard let sessionId, let hookEventName else { return nil }
         // Surface the running tool name when there's no explicit message.
         let context = message ?? toolName.map { "Using \($0)" }
         return AgentEvent(
-            sessionId: sessionId, agentKind: .claude, eventName: hookEventName,
+            sessionId: sessionId, agentKind: kind, eventName: hookEventName,
             project: cwd, message: context, timestamp: now
         )
     }
