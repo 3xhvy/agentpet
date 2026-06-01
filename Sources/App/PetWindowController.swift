@@ -15,6 +15,7 @@ final class PetWindowController: ObservableObject {
     private var panel: NSPanel?
     private var sizeCancellable: AnyCancellable?
     private var rightClickMonitor: Any?
+    private var screenObserver: Any?
 
     func start() {
         let size = PetController.shared.windowSize
@@ -34,11 +35,19 @@ final class PetWindowController: ObservableObject {
         panel.contentView = ClickThroughHostingView(rootView: FloatingPetView())
         self.panel = panel
 
-        applyFrame(size: size)
+        placeInitially(size: size)
         applyVisibility(isVisible)
 
+        // On size change, resize in place (keep the pet where the user put it).
         sizeCancellable = PetController.shared.$petPoint.sink { [weak self] point in
-            self?.applyFrame(size: PetController.windowSize(forPoint: point))
+            self?.resizeInPlace(to: PetController.windowSize(forPoint: point))
+        }
+
+        // If displays change (e.g. a monitor is unplugged), keep the pet on screen.
+        screenObserver = NotificationCenter.default.addObserver(
+            forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated { self?.ensureOnScreen() }
         }
 
         // Right-click the pet to open the popover anchored at the pet.
@@ -56,13 +65,41 @@ final class PetWindowController: ObservableObject {
         }
     }
 
-    /// Resizes and repositions the panel in a single frame change (no jump),
-    /// keeping it anchored to the bottom-right of the main screen.
-    private func applyFrame(size: CGSize) {
-        guard let panel, let screen = NSScreen.main else { return }
-        let visible = screen.visibleFrame
+    /// First-time placement: bottom-right of the main screen.
+    private func placeInitially(size: CGSize) {
+        guard let panel, let visible = NSScreen.main?.visibleFrame else { return }
         let origin = NSPoint(x: visible.maxX - size.width - 16, y: visible.minY + 24)
         panel.setFrame(NSRect(origin: origin, size: size), display: true, animate: false)
+    }
+
+    /// Resizes around the pet's bottom-center so it stays where the user
+    /// dragged it, clamped to whichever screen it currently sits on.
+    private func resizeInPlace(to size: CGSize) {
+        guard let panel else { return }
+        let old = panel.frame
+        var origin = NSPoint(x: old.midX - size.width / 2, y: old.minY)
+        if let visible = currentScreen(for: old)?.visibleFrame {
+            origin.x = min(max(origin.x, visible.minX), visible.maxX - size.width)
+            origin.y = min(max(origin.y, visible.minY), visible.maxY - size.height)
+        }
+        panel.setFrame(NSRect(origin: origin, size: size), display: true, animate: false)
+    }
+
+    /// Keeps the pet visible after a display configuration change: if its
+    /// screen vanished (unplugged), move it onto the main screen.
+    private func ensureOnScreen() {
+        guard let panel else { return }
+        let frame = panel.frame
+        if currentScreen(for: frame) != nil { return }   // still on a live screen
+        guard let visible = NSScreen.main?.visibleFrame else { return }
+        let origin = NSPoint(x: visible.maxX - frame.width - 16, y: visible.minY + 24)
+        panel.setFrameOrigin(origin)
+    }
+
+    /// The screen whose frame contains the window's center, if any.
+    private func currentScreen(for frame: NSRect) -> NSScreen? {
+        let center = NSPoint(x: frame.midX, y: frame.midY)
+        return NSScreen.screens.first { NSPointInRect(center, $0.frame) }
     }
 
     private func applyVisibility(_ visible: Bool) {
