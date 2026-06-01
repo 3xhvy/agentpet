@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>AgentPet — a desktop pet that watches your AI coding agents</title>
+<meta name="description" content="Native macOS menu bar app with a desktop pet that monitors Claude Code, Codex and Gemini CLI in real time." />
+<meta property="og:title" content="AgentPet" />
+<meta property="og:description" content="A desktop pet that watches your AI coding agents." />
+<meta property="og:image" content="https://raw.githubusercontent.com/ntd4996/agentpet/main/assets/banner.png" />
+<style>
+  :root { --bg:#0b1020; --bg2:#160d2c; --accent:#7468fb; --card:rgba(255,255,255,.05); --stroke:rgba(255,255,255,.1); --muted:#a0a3d2; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,sans-serif; color:#fff;
+         background:radial-gradient(900px 500px at 80% -5%, rgba(116,104,251,.28), transparent), linear-gradient(160deg,var(--bg),var(--bg2)); min-height:100vh; }
+  .wrap { max-width:960px; margin:0 auto; padding:0 24px; }
+  header { padding:80px 0 48px; text-align:center; }
+  .icon { width:96px; height:96px; border-radius:24px; background:linear-gradient(180deg,#857afc,#5c45dc);
+          display:inline-flex; align-items:center; justify-content:center; font-size:48px; box-shadow:0 12px 40px rgba(116,104,251,.45); }
+  h1 { font-size:56px; letter-spacing:-.02em; margin:20px 0 10px; }
+  .tag { font-size:20px; color:var(--muted); max-width:620px; margin:0 auto 28px; }
+  .cta { display:flex; gap:12px; justify-content:center; flex-wrap:wrap; }
+  .btn { display:inline-flex; align-items:center; gap:8px; padding:12px 22px; border-radius:12px; font-weight:600; text-decoration:none; font-size:15px; }
+  .btn.primary { background:var(--accent); color:#fff; }
+  .btn.ghost { background:var(--card); color:#fff; border:1px solid var(--stroke); }
+  code, .brew { font-family:ui-monospace,SFMono-Regular,Menlo,monospace; }
+  .brew { display:inline-block; margin-top:22px; background:#0008; border:1px solid var(--stroke); padding:12px 18px; border-radius:10px; color:#cfd2ff; font-size:14px; }
+  section { padding:40px 0; }
+  .shot { width:100%; border-radius:16px; border:1px solid var(--stroke); box-shadow:0 20px 60px rgba(0,0,0,.4); }
+  .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:16px; margin-top:24px; }
+  .feature { background:var(--card); border:1px solid var(--stroke); border-radius:14px; padding:20px; }
+  .feature h3 { font-size:17px; margin-bottom:6px; }
+  .feature p { color:var(--muted); font-size:14px; line-height:1.5; }
+  h2 { font-size:30px; text-align:center; letter-spacing:-.01em; }
+  .shots { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:24px; }
+  .shots img { width:100%; border-radius:14px; border:1px solid var(--stroke); }
+  footer { text-align:center; color:var(--muted); padding:48px 0 64px; font-size:14px; }
+  footer a { color:#bdbfff; }
+  .note { color:var(--muted); font-size:13px; margin-top:10px; }
+  @media (max-width:640px){ h1{font-size:40px} .shots{grid-template-columns:1fr} }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div class="icon">🐾</div>
+      <h1>AgentPet</h1>
+      <p class="tag">A native macOS menu bar app with a desktop pet that watches your AI coding agents (Claude Code, Codex, Gemini CLI) in real time.</p>
+      <div class="cta">
+        <a class="btn primary" href="https://github.com/ntd4996/agentpet/releases/latest">Download for macOS</a>
+        <a class="btn ghost" href="https://github.com/ntd4996/agentpet">⭐ Star on GitHub</a>
+      </div>
+      <div class="brew">brew install --cask ntd4996/tap/agentpet</div>
+      <p class="note">macOS 13+ · Apple Silicon &amp; Intel · MIT licensed</p>
+    </header>
+
+    <section>
+      <img class="shot" src="https://raw.githubusercontent.com/ntd4996/agentpet/main/assets/demo.gif" alt="AgentPet demo" />
+    </section>
+
+    <section>
+      <h2>Stop tab-hunting across terminals</h2>
+      <div class="grid">
+        <div class="feature"><h3>Multi-agent monitor</h3><p>A live menu bar list of every agent: state, what it's doing, and a real-time timer.</p></div>
+        <div class="feature"><h3>At a glance</h3><p>The menu bar icon shows how many agents run, and turns orange when one needs your input.</p></div>
+        <div class="feature"><h3>Desktop pet</h3><p>A pet reacts to agent activity — working, waiting, done, celebrate — with optional chat bubbles.</p></div>
+        <div class="feature"><h3>Claude Code · Codex · Gemini</h3><p>One-tap hook install for precise working / waiting / done detection. Any CLI agent via <code>agentpet run</code>.</p></div>
+        <div class="feature"><h3>Native notifications &amp; sounds</h3><p>Get alerted (and hear it) when an agent finishes or needs you.</p></div>
+        <div class="feature"><h3>Bring your own pet</h3><p>Browse an online pet library and download with one click. Map animations to states.</p></div>
+      </div>
+    </section>
+
+    <section>
+      <h2>See it</h2>
+      <div class="shots">
+        <img src="https://raw.githubusercontent.com/ntd4996/agentpet/main/assets/screenshot-menubar.png" alt="Menu bar monitor" />
+        <img src="https://raw.githubusercontent.com/ntd4996/agentpet/main/assets/screenshot-settings.png" alt="Settings" />
+        <img src="https://raw.githubusercontent.com/ntd4996/agentpet/main/assets/screenshot-pet.png" alt="Pet" />
+        <img src="https://raw.githubusercontent.com/ntd4996/agentpet/main/assets/screenshot-notification.png" alt="Notification" />
+      </div>
+    </section>
+
+    <footer>
+      Built by <a href="https://github.com/ntd4996">@ntd4996</a> ·
+      <a href="https://github.com/ntd4996/agentpet">GitHub</a> ·
+      <a href="https://buymeacoffee.com/ntd4996">Buy me a coffee</a><br/>
+      Pet format &amp; library by <a href="https://github.com/crafter-station/petdex">Petdex</a>.
+    </footer>
+  </div>
+</body>
+</html>
