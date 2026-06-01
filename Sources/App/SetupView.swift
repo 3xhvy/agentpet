@@ -373,14 +373,7 @@ private struct PetTab: View {
                     Text("No pets yet. Tap Browse to add one.").foregroundStyle(.secondary)
                 } else {
                     if imagePets.packs.count > 4 {
-                        HStack(spacing: 6) {
-                            Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
-                            TextField("Search your pets", text: $petQuery)
-                                .textFieldStyle(.plain)
-                        }
-                        .padding(8)
-                        .background(RoundedRectangle(cornerRadius: 8).fill(.quaternary))
-                        .contentShape(Rectangle())
+                        NativeSearchField(text: $petQuery, placeholder: "Search your pets")
                     }
                     PetPager(packs: filteredPacks, selectedID: pet.selectedPetID,
                              onSelect: { pet.selectedPetID = $0 },

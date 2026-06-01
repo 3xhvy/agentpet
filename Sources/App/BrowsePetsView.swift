@@ -15,14 +15,8 @@ struct BrowsePetsView: View {
             .padding(12)
             Divider()
 
-            HStack {
-                Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
-                TextField("Search pets", text: $browser.query)
-                    .textFieldStyle(.plain)
-            }
-            .padding(8)
-            .background(RoundedRectangle(cornerRadius: 8).fill(.quaternary))
-            .padding(.horizontal, 12).padding(.top, 12)
+            NativeSearchField(text: $browser.query, placeholder: "Search pets")
+                .padding(.horizontal, 12).padding(.top, 12)
 
             Picker("Category", selection: $browser.category) {
                 ForEach(PetBrowser.categories, id: \.value) { Text($0.label).tag($0.value) }
