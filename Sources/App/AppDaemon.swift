@@ -66,9 +66,11 @@ final class AppDaemon: ObservableObject {
         case .waiting:
             NotificationManager.shared.notify(
                 title: "\(project) needs input", body: session.message ?? "Waiting for you")
+            SoundSettings.shared.play(.waiting)
         case .done:
             NotificationManager.shared.notify(
                 title: "\(project) finished", body: "Agent completed its turn")
+            SoundSettings.shared.play(.done)
         default:
             break
         }

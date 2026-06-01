@@ -136,12 +136,48 @@ private struct AboutTab: View {
     }
 }
 
+private struct SoundRow: View {
+    let title: String
+    @Binding var enabled: Bool
+    let customPath: String
+    let onPlay: () -> Void
+    let onUpload: () -> Void
+    let onReset: () -> Void
+
+    private var sourceLabel: String {
+        customPath.isEmpty ? "Default" : (customPath as NSString).lastPathComponent
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text(title)
+                Spacer()
+                ColorSwitch(isOn: $enabled)
+            }
+            HStack(spacing: 8) {
+                Text(sourceLabel)
+                    .font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                Spacer()
+                Button { onPlay() } label: { Image(systemName: "play.circle") }.buttonStyle(.plain)
+                Button("Upload…") { onUpload() }.controlSize(.small)
+                if !customPath.isEmpty {
+                    Button("Default") { onReset() }.controlSize(.small)
+                }
+            }
+            .disabled(!enabled)
+            .opacity(enabled ? 1 : 0.5)
+        }
+    }
+}
+
 // MARK: - General (merged setup + general)
 
 private struct GeneralTab: View {
     @ObservedObject var model: SettingsModel
     @ObservedObject var pet: PetController
     @ObservedObject private var chat = ChatSettings.shared
+    @ObservedObject private var sound = SoundSettings.shared
 
     var body: some View {
         Form {
@@ -201,6 +237,21 @@ private struct GeneralTab: View {
                             .controlSize(.small)
                     }
                 }
+            }
+
+            Section("Sounds") {
+                SoundRow(title: "When an agent finishes",
+                         enabled: $sound.doneEnabled,
+                         customPath: sound.doneCustomPath,
+                         onPlay: { sound.play(.done) },
+                         onUpload: { sound.upload(for: .done) },
+                         onReset: { sound.resetToDefault(.done) })
+                SoundRow(title: "When an agent needs input",
+                         enabled: $sound.waitingEnabled,
+                         customPath: sound.waitingCustomPath,
+                         onPlay: { sound.play(.waiting) },
+                         onUpload: { sound.upload(for: .waiting) },
+                         onReset: { sound.resetToDefault(.waiting) })
             }
 
             Section("Agent integrations") {
