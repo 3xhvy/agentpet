@@ -15,8 +15,7 @@
          background:radial-gradient(900px 500px at 80% -5%, rgba(116,104,251,.28), transparent), linear-gradient(160deg,var(--bg),var(--bg2)); min-height:100vh; }
   .wrap { max-width:960px; margin:0 auto; padding:0 24px; }
   header { padding:80px 0 48px; text-align:center; }
-  .icon { width:96px; height:96px; border-radius:24px; background:linear-gradient(180deg,#857afc,#5c45dc);
-          display:inline-flex; align-items:center; justify-content:center; font-size:48px; box-shadow:0 12px 40px rgba(116,104,251,.45); }
+  .icon { width:96px; height:96px; border-radius:24px; box-shadow:0 12px 40px rgba(116,104,251,.45); }
   h1 { font-size:56px; letter-spacing:-.02em; margin:20px 0 10px; }
   .tag { font-size:20px; color:var(--muted); max-width:620px; margin:0 auto 28px; }
   .cta { display:flex; gap:12px; justify-content:center; flex-wrap:wrap; }
@@ -43,7 +42,7 @@
 <body>
   <div class="wrap">
     <header>
-      <div class="icon">🐾</div>
+      <img class="icon" src="icon.png" alt="AgentPet" />
       <h1>AgentPet</h1>
       <p class="tag">A native macOS menu bar app with a desktop pet that watches your AI coding agents (Claude Code, Codex, Gemini CLI) in real time.</p>
       <div class="cta">
@@ -55,7 +54,7 @@
     </header>
 
     <section>
-      <img class="shot" src="https://raw.githubusercontent.com/ntd4996/agentpet/main/assets/demo.gif" alt="AgentPet demo" />
+      <video class="shot" src="demo.mp4" autoplay loop muted playsinline></video>
     </section>
 
     <section>
