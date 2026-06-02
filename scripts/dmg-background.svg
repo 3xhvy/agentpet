@@ -1,0 +1,37 @@
+<svg width="660" height="420" viewBox="0 0 660 420" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#241c47"/>
+      <stop offset="1" stop-color="#120e26"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#7c6cff" stop-opacity="0.34"/>
+      <stop offset="1" stop-color="#7c6cff" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="arrow" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#8b7cff" stop-opacity="0.55"/>
+      <stop offset="1" stop-color="#a99bff" stop-opacity="1"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="660" height="420" fill="url(#bg)"/>
+  <ellipse cx="330" cy="40" rx="430" ry="240" fill="url(#glow)"/>
+  <circle cx="180" cy="206" r="84" fill="url(#glow)"/>
+  <circle cx="480" cy="206" r="84" fill="url(#glow)"/>
+
+  <!-- wordmark + instruction -->
+  <text x="330" y="84" text-anchor="middle" font-family="-apple-system, 'SF Pro Display', 'Helvetica Neue', Arial, sans-serif" font-size="34" font-weight="700" fill="#ffffff" letter-spacing="0.3">AgentPet</text>
+  <text x="330" y="116" text-anchor="middle" font-family="-apple-system, 'SF Pro Text', 'Helvetica Neue', Arial, sans-serif" font-size="15" font-weight="500" fill="#c3bcec">Drag AgentPet into your Applications folder</text>
+
+  <!-- arrow from app to Applications -->
+  <g transform="translate(0,206)">
+    <line x1="258" y1="0" x2="398" y2="0" stroke="url(#arrow)" stroke-width="6" stroke-linecap="round"/>
+    <path d="M392 -13 L416 0 L392 13" fill="none" stroke="#a99bff" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+
+  <!-- light name-tag plates so Finder's (always-dark) icon labels read clearly -->
+  <g>
+    <rect x="114" y="268" width="132" height="28" rx="14" fill="#e9e6f7" opacity="0.92"/>
+    <rect x="412" y="268" width="136" height="28" rx="14" fill="#e9e6f7" opacity="0.92"/>
+  </g>
+</svg>

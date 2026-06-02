@@ -51,8 +51,19 @@ make_dmg() {
     rm -f "$DMG"; rm -rf "$STAGE"; mkdir -p "$STAGE"
     # ditto preserves the stapled notarization ticket inside the app bundle.
     ditto "$APP" "$STAGE/AgentPet.app"
-    ln -s /Applications "$STAGE/Applications"
-    hdiutil create -volname "AgentPet" -srcfolder "$STAGE" -ov -format UDZO "$DMG" >/dev/null
+    # create-dmg lays out a branded install window: custom background, the app on
+    # the left, an arrow, and the Applications drop target on the right.
+    create-dmg \
+        --volname "AgentPet" \
+        --background "$ROOT/scripts/dmg-background.tiff" \
+        --window-pos 200 120 \
+        --window-size 660 420 \
+        --icon-size 120 \
+        --icon "AgentPet.app" 180 206 \
+        --app-drop-link 480 206 \
+        --hide-extension "AgentPet.app" \
+        --no-internet-enable \
+        "$DMG" "$STAGE" >/dev/null
 }
 
 if [ -n "${SKIP_NOTARIZE:-}" ]; then
