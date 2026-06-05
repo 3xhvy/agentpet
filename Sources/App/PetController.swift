@@ -37,7 +37,12 @@ final class PetController: ObservableObject {
     private var lastResolved: PetMood = .idle
     private var latestSessions: [AgentSession] = []
     private var celebrateTimer: Timer?
-    private var chatTimer: Timer?
+
+    // Ticker state
+    private var tickerIndex: Int = 0
+    private var tickerSessions: [AgentSession] = []
+    private var tickerTimer: Timer?
+    private static let tickerInterval: TimeInterval = 4.0
 
     private static let petKey = "agentpet.selectedPetID"
     private static let chatKey = "agentpet.showChat"
@@ -52,10 +57,7 @@ final class PetController: ObservableObject {
     }
 
     func start() {
-        // Vary the chat line periodically while the pet is active.
-        chatTimer = Timer.scheduledTimer(withTimeInterval: 5, repeats: true) { _ in
-            Task { @MainActor [weak self] in self?.refreshChat() }
-        }
+        // Ticker drives chatLine updates; no separate chat timer needed.
     }
 
     private var sizeAnimTimer: Timer?
@@ -94,6 +96,7 @@ final class PetController: ObservableObject {
         defer { lastResolved = resolved }
 
         if resolved == .done && lastResolved != .done {
+            stopTicker()
             setMood(.celebrate)
             celebrateTimer?.invalidate()
             celebrateTimer = Timer.scheduledTimer(withTimeInterval: Self.celebrateDuration, repeats: false) { _ in
@@ -106,6 +109,12 @@ final class PetController: ObservableObject {
         }
         celebrateTimer?.invalidate()
         setMood(resolved)
+
+        if resolved == .working || resolved == .waiting {
+            applyTickerSessions(sessions)
+        } else {
+            stopTicker()
+        }
     }
 
     private func settleAfterCelebrate() {
@@ -118,13 +127,72 @@ final class PetController: ObservableObject {
     }
 
     private func refreshChat() {
+        guard showChat, mood != .idle else {
+            chatLine = ""
+            StatusBarController.shared.refreshTitle()
+            return
+        }
+        // During working/waiting the ticker owns chatLine; fall back to PetChat
+        // for celebrate/done where the ticker is stopped.
+        if (mood == .working || mood == .waiting) && !tickerSessions.isEmpty {
+            showCurrentTickerLine()
+            return
+        }
         let pool = ChatSettings.shared.lines(for: mood)
-        guard showChat, mood != .idle, !pool.isEmpty else {
+        guard !pool.isEmpty else {
             chatLine = ""
             StatusBarController.shared.refreshTitle()
             return
         }
         chatLine = pool.randomElement() ?? ""
+        StatusBarController.shared.refreshTitle()
+    }
+
+    // MARK: - Ticker
+
+    private func applyTickerSessions(_ sessions: [AgentSession]) {
+        let active = sessions.filter { $0.state != .idle && $0.state != .registered }
+        let sorted = TickerFormatter.sorted(active)
+        let changed = sorted.map(\.id) != tickerSessions.map(\.id)
+        tickerSessions = sorted
+        if sorted.isEmpty {
+            stopTicker()
+            chatLine = ""
+            StatusBarController.shared.refreshTitle()
+            return
+        }
+        if changed { tickerIndex = 0 }
+        showCurrentTickerLine()
+        startTickerIfNeeded()
+    }
+
+    private func startTickerIfNeeded() {
+        guard tickerTimer == nil else { return }
+        tickerTimer = Timer.scheduledTimer(withTimeInterval: Self.tickerInterval, repeats: true) { _ in
+            Task { @MainActor [weak self] in self?.advanceTicker() }
+        }
+    }
+
+    private func stopTicker() {
+        tickerTimer?.invalidate()
+        tickerTimer = nil
+        tickerIndex = 0
+        tickerSessions = []
+    }
+
+    private func advanceTicker() {
+        guard !tickerSessions.isEmpty else { stopTicker(); return }
+        tickerIndex = (tickerIndex + 1) % tickerSessions.count
+        showCurrentTickerLine()
+    }
+
+    private func showCurrentTickerLine() {
+        guard showChat, !tickerSessions.isEmpty else {
+            chatLine = ""
+            StatusBarController.shared.refreshTitle()
+            return
+        }
+        chatLine = TickerFormatter.line(for: tickerSessions[tickerIndex % tickerSessions.count])
         StatusBarController.shared.refreshTitle()
     }
 }
