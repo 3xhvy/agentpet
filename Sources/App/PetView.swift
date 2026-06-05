@@ -53,22 +53,34 @@ struct FloatingPetView: View {
 
 // MARK: - Agent Bubble (structured rows for working/waiting)
 
-/// Speech bubble listing one row per active agent session.
+/// Sessions with the same agent kind + project are collapsed into one row.
+private struct GroupedSession: Identifiable {
+    let session: AgentSession   // highest-priority session in the group
+    let count: Int              // total sessions sharing this kind+project
+    var id: String { session.id }
+}
+
+/// Speech bubble listing one row per (agentKind, project) group.
 /// Applies filter/sort/cap from `BubbleSettings` before rendering.
 private struct AgentBubble: View {
     let sessions: [AgentSession]
     @ObservedObject private var settings = BubbleSettings.shared
 
-    private var displaySessions: [AgentSession] {
-        var result = sessions
+    // attentionPriority is internal to AgentPetCore — use local rank
+    private func rank(_ s: AgentState) -> Int {
+        switch s { case .working: 4; case .waiting: 3; case .done: 2; case .registered: 1; case .idle: 0 }
+    }
+
+    private var groupedSessions: [GroupedSession] {
+        // 1. Filter
+        let filtered = sessions
             .filter { !settings.hiddenKinds.contains($0.agentKind) }
             .filter { settings.minStateFilter.includes($0.state) }
-        // attentionPriority is internal to AgentPetCore — sort by explicit state rank
-        func rank(_ s: AgentState) -> Int {
-            switch s { case .working: 4; case .waiting: 3; case .done: 2; case .registered: 1; case .idle: 0 }
-        }
+
+        // 2. Sort
+        var sorted = filtered
         if settings.groupByKind {
-            result.sort {
+            sorted.sort {
                 if $0.agentKind.rawValue != $1.agentKind.rawValue {
                     return $0.agentKind.rawValue < $1.agentKind.rawValue
                 }
@@ -76,19 +88,35 @@ private struct AgentBubble: View {
                 return $0.updatedAt > $1.updatedAt
             }
         } else {
-            result.sort {
+            sorted.sort {
                 if rank($0.state) != rank($1.state) { return rank($0.state) > rank($1.state) }
                 return $0.updatedAt > $1.updatedAt
             }
         }
+
+        // 3. Collapse sessions that share the same (agentKind, project) into one row
+        var seen: [String: Int] = [:]        // groupKey → index in result
+        var result: [GroupedSession] = []
+        for s in sorted {
+            let projectKey = s.project.map { ($0 as NSString).lastPathComponent } ?? s.id
+            let groupKey = "\(s.agentKind.rawValue)|\(projectKey)"
+            if let idx = seen[groupKey] {
+                result[idx] = GroupedSession(session: result[idx].session, count: result[idx].count + 1)
+            } else {
+                seen[groupKey] = result.count
+                result.append(GroupedSession(session: s, count: 1))
+            }
+        }
+
+        // 4. Cap to maxSessions
         return Array(result.prefix(settings.maxSessions))
     }
 
     var body: some View {
         VStack(spacing: 0) {
             VStack(alignment: .leading, spacing: 5) {
-                ForEach(displaySessions) { session in
-                    AgentRow(session: session)
+                ForEach(groupedSessions) { group in
+                    AgentRow(session: group.session, count: group.count)
                 }
             }
             .padding(.horizontal, 12)
@@ -120,9 +148,12 @@ private struct AgentBubble: View {
     }
 }
 
-/// One row per session — iterates `BubbleSettings.effectiveLayout` tokens in order.
+/// One row per (agentKind, project) group.
+/// Iterates `BubbleSettings.effectiveLayout` tokens in order and appends a
+/// count badge (×N) when more than one session shares the group.
 private struct AgentRow: View {
     let session: AgentSession
+    var count: Int = 1
     @ObservedObject private var settings = BubbleSettings.shared
 
     var body: some View {
@@ -130,6 +161,17 @@ private struct AgentRow: View {
         HStack(alignment: .center, spacing: 4) {
             ForEach(visible) { item in
                 tokenView(for: item.token)
+            }
+            if count > 1 {
+                Text("×\(count)")
+                    .font(.system(size: settings.fontSize.secondaryPt, weight: .semibold))
+                    .foregroundStyle(textColor(0.5))
+                    .padding(.horizontal, 4)
+                    .padding(.vertical, 1)
+                    .background(
+                        Capsule()
+                            .fill(textColor(0.08))
+                    )
             }
         }
     }
