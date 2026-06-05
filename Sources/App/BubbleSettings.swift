@@ -207,8 +207,8 @@ final class BubbleSettings: ObservableObject {
     @Published var groupByKind: Bool {
         didSet { ud.set(groupByKind, forKey: Keys.groupByKind) }
     }
-    /// When true, sessions sharing the same (agentKind, project) are collapsed
-    /// into a single row with a ×N badge. Turn off to see every session separately.
+    /// When true, rows with the same session id are collapsed into one row with
+    /// a ×N badge (normally one row per session; leave off for separate sessions).
     @Published var collapseDuplicates: Bool {
         didSet { ud.set(collapseDuplicates, forKey: Keys.collapseDuplicates) }
     }
@@ -263,7 +263,7 @@ final class BubbleSettings: ObservableObject {
         maxSessions    = ud.object(forKey: Keys.maxSessions) as? Int ?? 5
         minStateFilter = MinStateFilter(rawValue: ud.string(forKey: Keys.minStateFilter) ?? "") ?? .all
         groupByKind        = ud.bool(forKey: Keys.groupByKind)
-        collapseDuplicates = ud.object(forKey: Keys.collapseDuplicates) as? Bool ?? true
+        collapseDuplicates = ud.object(forKey: Keys.collapseDuplicates) as? Bool ?? false
         hiddenKinds        = Set((Self.loadJSON(Keys.hiddenKinds) as [String]? ?? []).compactMap(AgentKind.init(rawValue:)))
         iconChoices    = Self.loadJSON(Keys.iconChoices) ?? [:]
     }

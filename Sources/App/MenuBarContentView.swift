@@ -103,6 +103,7 @@ struct MenuContentView: View {
             controlRow(icon: "pawprint", label: "Show pet", isOn: $petWindow.isVisible)
             controlRow(icon: "number", label: "Show count on menu bar", isOn: $statusBar.showCount)
             controlRow(icon: "bubble.left", label: "Show chat on menu bar", isOn: $statusBar.showChatOnMenuBar)
+            controlRow(icon: "list.bullet.rectangle", label: "Show bubble on menu bar", isOn: $statusBar.showBubbleOnMenuBar)
             sizeRow
         }
     }
@@ -157,6 +158,19 @@ struct MenuContentView: View {
             }
         }
         .padding(.horizontal, 14).padding(.vertical, 10)
+    }
+}
+
+// MARK: - Menu bar hanging bubble
+
+/// Thin wrapper so the agent bubble shown below the menu bar icon
+/// auto-refreshes via @ObservedObject without re-creating the NSPanel.
+struct MenuBarBubbleView: View {
+    @ObservedObject private var pet = PetController.shared
+
+    var body: some View {
+        AgentBubble(sessions: pet.activeAgentSessions, tailEdge: .top)
+            .environment(\.colorScheme, .dark)
     }
 }
 

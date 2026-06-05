@@ -27,6 +27,15 @@ struct PetView: View {
     }
 }
 
+/// Reports the natural size of the pet + bubble so the window can hug its content.
+private struct PetContentSizeKey: PreferenceKey {
+    static var defaultValue: CGSize { .zero }
+    static func reduce(value: inout CGSize, nextValue: () -> CGSize) {
+        let next = nextValue()
+        if next.width > 0, next.height > 0 { value = next }
+    }
+}
+
 /// The full floating window content: a chat bubble above the pet.
 struct FloatingPetView: View {
     @ObservedObject private var pet = PetController.shared
@@ -38,13 +47,21 @@ struct FloatingPetView: View {
                     AgentBubble(sessions: pet.activeAgentSessions)
                         .transition(AnyTransition.scale(scale: 0.6).combined(with: .opacity))
                 } else if !pet.chatLine.isEmpty {
-                ChatBubble(text: pet.chatLine)
+                    ChatBubble(text: pet.chatLine)
                         .transition(AnyTransition.scale(scale: 0.6).combined(with: .opacity))
                 }
             }
             PetView(size: pet.petPoint)
         }
-        .frame(width: pet.windowSize.width, height: pet.windowSize.height, alignment: .bottom)
+        .fixedSize(horizontal: true, vertical: true)
+        .background(
+            GeometryReader { proxy in
+                Color.clear.preference(key: PetContentSizeKey.self, value: proxy.size)
+            }
+        )
+        .onPreferenceChange(PetContentSizeKey.self) { size in
+            PetWindowController.shared.resizeToContent(size)
+        }
         .animation(.spring(response: 0.35, dampingFraction: 0.7), value: pet.chatLine)
         .animation(.spring(response: 0.35, dampingFraction: 0.7), value: pet.activeAgentSessions.count)
         .animation(.easeInOut, value: pet.showChat)
@@ -62,8 +79,10 @@ private struct GroupedSession: Identifiable {
 
 /// Speech bubble listing one row per (agentKind, project) group.
 /// Applies filter/sort/cap from `BubbleSettings` before rendering.
-private struct AgentBubble: View {
+/// `tailEdge` controls whether the pointer arrow points down (pet) or up (menu bar).
+struct AgentBubble: View {
     let sessions: [AgentSession]
+    var tailEdge: Edge = .bottom
     @ObservedObject private var settings = BubbleSettings.shared
 
     // attentionPriority is internal to AgentPetCore — use local rank
@@ -94,18 +113,16 @@ private struct AgentBubble: View {
             }
         }
 
-        // 3. Optionally collapse sessions sharing the same (agentKind, project) into one row.
+        // 3. One row per session id. Collapse only exact duplicate ids (defensive).
         var result: [GroupedSession]
         if settings.collapseDuplicates {
             var seen: [String: Int] = [:]
             result = []
             for s in sorted {
-                let projectKey = s.project.map { ($0 as NSString).lastPathComponent } ?? s.id
-                let groupKey = "\(s.agentKind.rawValue)|\(projectKey)"
-                if let idx = seen[groupKey] {
+                if let idx = seen[s.id] {
                     result[idx] = GroupedSession(session: result[idx].session, count: result[idx].count + 1)
                 } else {
-                    seen[groupKey] = result.count
+                    seen[s.id] = result.count
                     result.append(GroupedSession(session: s, count: 1))
                 }
             }
@@ -117,24 +134,55 @@ private struct AgentBubble: View {
         return Array(result.prefix(settings.maxSessions))
     }
 
+    private var isPetChat: Bool { tailEdge == .bottom }
+
     var body: some View {
+        let fill = isPetChat ? Color.white : bubbleFill
+        let stroke = isPetChat ? Color.black.opacity(0.06) : borderColor
+
         VStack(spacing: 0) {
-            VStack(alignment: .leading, spacing: 5) {
+            if tailEdge == .top {
+                Triangle()
+                    .fill(fill)
+                    .frame(width: 12, height: 7)
+                    .scaleEffect(x: 1, y: -1)
+            }
+            VStack(alignment: .leading, spacing: isPetChat ? 4 : 5) {
                 ForEach(groupedSessions) { group in
-                    AgentRow(session: group.session, count: group.count)
+                    AgentRow(session: group.session, count: group.count, chatStyle: isPetChat)
                 }
             }
             .padding(.horizontal, 12)
-            .padding(.vertical, 9)
-            .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(bubbleFill))
-            .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(borderColor, lineWidth: 1))
+            .padding(.vertical, isPetChat ? 7 : 9)
+            .background {
+                if isPetChat {
+                    Capsule().fill(fill)
+                } else {
+                    RoundedRectangle(cornerRadius: 14, style: .continuous).fill(fill)
+                }
+            }
+            .overlay {
+                if isPetChat {
+                    Capsule().strokeBorder(stroke, lineWidth: 1)
+                } else {
+                    RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(stroke, lineWidth: 1)
+                }
+            }
             .shadow(color: .black.opacity(0.18), radius: 5, y: 2)
-            Triangle()
-                .fill(bubbleFill)
-                .frame(width: 12, height: 7)
+            if tailEdge == .bottom {
+                Triangle()
+                    .fill(fill)
+                    .frame(width: 12, height: 7)
+            }
         }
-        .frame(maxWidth: 420)
+        .fixedSize(horizontal: isPetChat, vertical: true)
+        .frame(maxWidth: 420, alignment: .leading)
     }
+
+    /// Inner content width cap (bubble max minus horizontal padding).
+    static let contentMaxWidth: CGFloat = 396
+    /// Pet chat bubble hugs content; still capped for very long lines.
+    static let petContentMaxWidth: CGFloat = 320
 
     private var bubbleFill: Color {
         switch settings.theme {
@@ -153,75 +201,96 @@ private struct AgentBubble: View {
     }
 }
 
-/// One row per (agentKind, project) group.
-/// Iterates `BubbleSettings.effectiveLayout` tokens in order and appends a
-/// count badge (×N) when more than one session shares the group.
+/// One row per agent session. Iterates `BubbleSettings.effectiveLayout` tokens
+/// in order on a single line; project/title shrink before the message does.
 private struct AgentRow: View {
     let session: AgentSession
     var count: Int = 1
+    var chatStyle: Bool = false
     @ObservedObject private var settings = BubbleSettings.shared
+
+    private var primaryPt: CGFloat { chatStyle ? 12 : settings.fontSize.primaryPt }
+    private var secondaryPt: CGFloat { chatStyle ? 10.5 : settings.fontSize.secondaryPt }
+    private var iconPt: CGFloat { chatStyle ? 14 : settings.fontSize.iconPt }
+    private var rowMaxWidth: CGFloat {
+        chatStyle ? AgentBubble.petContentMaxWidth : AgentBubble.contentMaxWidth
+    }
+
+    private var isWaiting: Bool { session.state == .waiting }
 
     var body: some View {
         let visible = settings.effectiveLayout.tokens.filter { $0.isVisible && tokenHasValue($0.token) }
+
         HStack(alignment: .center, spacing: 4) {
-            ForEach(visible) { item in
-                tokenView(for: item.token)
+            if visible.contains(where: { $0.token == .dot }) {
+                tokenView(for: .dot)
             }
-            if count > 1 {
-                Text("×\(count)")
-                    .font(.system(size: settings.fontSize.secondaryPt, weight: .semibold))
-                    .foregroundStyle(textColor(0.5))
-                    .padding(.horizontal, 4)
-                    .padding(.vertical, 1)
-                    .background(
-                        Capsule()
-                            .fill(textColor(0.08))
-                    )
+            HStack(alignment: .center, spacing: 4) {
+                ForEach(visible.filter { $0.token != .dot }) { item in
+                    tokenView(for: item.token)
+                }
+                if count > 1 {
+                    Text("×\(count)")
+                        .font(.system(size: settings.fontSize.secondaryPt, weight: .semibold))
+                        .foregroundStyle(textColor(0.5))
+                        .padding(.horizontal, 4)
+                        .padding(.vertical, 1)
+                        .background(
+                            Capsule()
+                                .fill(textColor(0.08))
+                        )
+                }
             }
+            .modifier(WaitingTextFlash(active: isWaiting))
         }
+        .frame(maxWidth: rowMaxWidth, alignment: .leading)
     }
 
     @ViewBuilder
     private func tokenView(for token: BubbleToken) -> some View {
         switch token {
         case .dot:
-            PulsingDot(color: stateDotColor, pulse: session.state == .done)
+            StateDot(color: stateDotColor, style: dotStyle)
         case .icon:
             ResolvedIconView(
                 choice: settings.iconChoice(for: session.agentKind),
-                size: settings.fontSize.iconPt
+                size: iconPt
             )
         case .title:
             if let title = session.title {
                 Text(title)
-                    .font(.system(size: settings.fontSize.primaryPt, weight: .semibold))
+                    .font(.system(size: primaryPt, weight: .semibold))
                     .foregroundStyle(textColor(0.85))
                     .lineLimit(1)
                     .truncationMode(.tail)
+                    .layoutPriority(-1)
             }
         case .project:
             Text(projectName)
-                .font(.system(size: settings.fontSize.primaryPt, weight: .medium))
+                .font(.system(size: primaryPt, weight: .medium))
                 .foregroundStyle(textColor(0.82))
                 .lineLimit(1)
                 .truncationMode(.tail)
+                .layoutPriority(-1)
         case .separator:
             Text(settings.separatorChar)
-                .font(.system(size: settings.fontSize.primaryPt, weight: .regular))
+                .font(.system(size: primaryPt, weight: .regular))
                 .foregroundStyle(textColor(0.35))
         case .message:
             Text(messageText)
-                .font(.system(size: settings.fontSize.primaryPt, weight: .medium))
+                .font(.system(size: primaryPt, weight: .medium))
                 .foregroundStyle(textColor(0.82))
                 .lineLimit(1)
                 .truncationMode(.tail)
+                .layoutPriority(1)
+                .fixedSize(horizontal: false, vertical: true)
         case .stateLabel:
             Text(session.state.rawValue.capitalized)
-                .font(.system(size: settings.fontSize.secondaryPt, weight: .regular))
+                .font(.system(size: secondaryPt, weight: .regular))
                 .foregroundStyle(textColor(0.55))
         case .elapsed:
             Text(elapsedString(since: session.stateSince))
-                .font(.system(size: settings.fontSize.secondaryPt, weight: .regular))
+                .font(.system(size: secondaryPt, weight: .regular))
                 .foregroundStyle(textColor(0.45))
                 .monospacedDigit()
         }
@@ -233,6 +302,7 @@ private struct AgentRow: View {
     }
 
     private func textColor(_ opacity: Double) -> Color {
+        if chatStyle { return .black.opacity(opacity) }
         switch settings.theme {
         case .light:  return .black.opacity(opacity)
         case .dark:   return .white.opacity(opacity)
@@ -255,6 +325,13 @@ private struct AgentRow: View {
         case .working:           return Color(red: 0.22, green: 0.53, blue: 1.0)
         case .done:              return Color(red: 0.13, green: 0.77, blue: 0.37)
         case .idle, .registered: return .gray
+        }
+    }
+
+    private var dotStyle: StateDot.Style {
+        switch session.state {
+        case .working, .waiting, .done: return .pulse
+        default:                        return .plain
         }
     }
 
@@ -289,43 +366,76 @@ private struct ChatBubble: View {
                 .fill(.white)
                 .frame(width: 12, height: 7)
         }
+        .fixedSize(horizontal: true, vertical: true)
         .frame(maxWidth: 420)
     }
 }
 
-// MARK: - Pulsing dot
+// MARK: - State dot
 
-/// State dot that flashes when the agent has just finished (done state).
-private struct PulsingDot: View {
+/// State dot with optional sonar pulse (working, waiting, done) or plain.
+private struct StateDot: View {
+    enum Style { case plain, pulse }
+
     let color: Color
-    let pulse: Bool
-    @State private var animating = false
+    let style: Style
+
+    var body: some View {
+        Group {
+            switch style {
+            case .plain:
+                Circle().fill(color).frame(width: 6, height: 6)
+            case .pulse:
+                PulsingRingDot(color: color)
+            }
+        }
+        .frame(width: 14, height: 14)
+    }
+}
+
+private struct PulsingRingDot: View {
+    let color: Color
+    @State private var expanded = false
 
     var body: some View {
         ZStack {
-            if pulse {
-                // Outer ring that expands and fades
-                Circle()
-                    .stroke(color, lineWidth: 1.5)
-                    .frame(width: animating ? 14 : 6, height: animating ? 14 : 6)
-                    .opacity(animating ? 0 : 0.8)
-            }
+            Circle()
+                .stroke(color, lineWidth: 1.5)
+                .frame(width: expanded ? 14 : 6, height: expanded ? 14 : 6)
+                .opacity(expanded ? 0 : 0.8)
             Circle()
                 .fill(color)
                 .frame(width: 6, height: 6)
         }
-        .frame(width: 14, height: 14)
-        .onAppear { startIfNeeded() }
-        .onChange(of: pulse) { newPulse in
-            if newPulse { startIfNeeded() }
-            else { animating = false }
+        .onAppear {
+            withAnimation(.easeOut(duration: 0.9).repeatForever(autoreverses: false)) {
+                expanded = true
+            }
         }
     }
+}
 
-    private func startIfNeeded() {
-        guard pulse else { return }
-        withAnimation(.easeOut(duration: 0.9).repeatForever(autoreverses: false)) {
-            animating = true
+// MARK: - Waiting text flash
+
+/// Gently pulses row text opacity when waiting for input (no strikethrough).
+private struct WaitingTextFlash: ViewModifier {
+    let active: Bool
+    @State private var dimmed = false
+
+    func body(content: Content) -> some View {
+        content
+            .opacity(active ? (dimmed ? 0.4 : 1.0) : 1.0)
+            .onAppear { sync() }
+            .onChange(of: active) { _ in sync() }
+    }
+
+    private func sync() {
+        if active {
+            withAnimation(.easeInOut(duration: 1.1).repeatForever(autoreverses: true)) {
+                dimmed = true
+            }
+        } else {
+            dimmed = false
         }
     }
 }

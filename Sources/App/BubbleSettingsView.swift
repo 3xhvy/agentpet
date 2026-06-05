@@ -244,7 +244,7 @@ struct BubbleSettingsView: View {
             }
 
             Toggle("Group by agent kind", isOn: $settings.groupByKind)
-            Toggle("Collapse duplicate sessions", isOn: $settings.collapseDuplicates)
+            Toggle("Collapse same session id", isOn: $settings.collapseDuplicates)
 
             Section("Hide agents") {
                 ForEach(AgentCatalog.all, id: \.kind) { agent in
@@ -376,20 +376,20 @@ private struct BubbleRowPreview: View {
 
     var body: some View {
         let visible = settings.effectiveLayout.tokens.filter { $0.isVisible }
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(alignment: .center, spacing: 4) {
-                ForEach(visible) { item in
-                    tokenView(for: item.token)
-                }
-                if visible.isEmpty {
-                    Text("(empty)")
-                        .font(.caption)
-                        .foregroundStyle(.tertiary)
-                }
+
+        HStack(alignment: .center, spacing: 4) {
+            ForEach(visible) { item in
+                tokenView(for: item.token)
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
+            if visible.isEmpty {
+                Text("(empty)")
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+            }
         }
+        .frame(maxWidth: AgentBubble.contentMaxWidth, alignment: .leading)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
         .background(
             RoundedRectangle(cornerRadius: 12, style: .continuous)
                 .fill(Color(nsColor: .textBackgroundColor).opacity(settings.opacity))
@@ -428,6 +428,8 @@ private struct BubbleRowPreview: View {
             Text(mockMessage)
                 .font(.system(size: settings.fontSize.primaryPt, weight: .medium))
                 .lineLimit(1)
+                .truncationMode(.tail)
+                .layoutPriority(1)
         case .stateLabel:
             Text("Working")
                 .font(.system(size: settings.fontSize.secondaryPt))
