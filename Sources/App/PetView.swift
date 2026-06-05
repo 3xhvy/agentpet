@@ -88,11 +88,8 @@ private struct AgentRow: View {
                 .fill(stateDotColor)
                 .frame(width: 6, height: 6)
 
-            // Agent icon — SF Symbol unique to each agent kind
-            Image(systemName: agentSymbol)
-                .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(agentColor)
-                .frame(width: 14, alignment: .center)
+            // Real brand logo for the agent
+            AgentIconView(kind: session.agentKind, size: 14)
 
             // Project → activity
             Text(rowText)
@@ -117,35 +114,9 @@ private struct AgentRow: View {
     private var stateDotColor: Color {
         switch session.state {
         case .waiting:              return .orange
-        case .working:              return Color(red: 0.22, green: 0.53, blue: 1.0)  // vivid blue
-        case .done:                 return Color(red: 0.13, green: 0.77, blue: 0.37) // green
+        case .working:              return Color(red: 0.22, green: 0.53, blue: 1.0)
+        case .done:                 return Color(red: 0.13, green: 0.77, blue: 0.37)
         case .idle, .registered:    return .gray
-        }
-    }
-
-    private var agentSymbol: String {
-        switch session.agentKind {
-        case .claude:    return "sparkles"
-        case .cursor:    return "cursorarrow.rays"
-        case .codex:     return "terminal.fill"
-        case .gemini:    return "sparkle"
-        case .opencode:  return "hammer.fill"
-        case .windsurf:  return "wind"
-        case .cli:       return "terminal"
-        case .unknown:   return "questionmark.circle"
-        }
-    }
-
-    private var agentColor: Color {
-        switch session.agentKind {
-        case .claude:    return Color(red: 0.80, green: 0.47, blue: 0.36)  // Claude copper
-        case .cursor:    return Color(red: 0.10, green: 0.45, blue: 0.95)  // Cursor blue
-        case .codex:     return Color(red: 0.06, green: 0.73, blue: 0.51)  // Codex green
-        case .gemini:    return Color(red: 0.26, green: 0.52, blue: 0.96)  // Google blue
-        case .opencode:  return Color(red: 0.98, green: 0.45, blue: 0.09)  // orange
-        case .windsurf:  return Color(red: 0.02, green: 0.71, blue: 0.83)  // teal
-        case .cli:       return .secondary
-        case .unknown:   return .secondary
         }
     }
 }
