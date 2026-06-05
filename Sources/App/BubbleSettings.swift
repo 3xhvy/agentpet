@@ -68,7 +68,9 @@ struct BubbleLayout: Codable, Equatable {
         case .original: return .original
         case .standard: return .standard
         case .detailed: return .detailed
-        case .custom:   return .original
+        case .custom:
+            assertionFailure("preset(named:) should not be called with .custom — use effectiveLayout instead")
+            return .original
         }
     }
 }
@@ -121,6 +123,7 @@ enum MinStateFilter: String, CaseIterable, Codable {
     }
 
     func includes(_ state: AgentState) -> Bool {
+        // attentionPriority is internal to AgentPetCore — compare states explicitly
         switch self {
         case .all:               return true
         case .doneAndAbove:      return state == .working || state == .waiting || state == .done
@@ -228,24 +231,24 @@ final class BubbleSettings: ObservableObject {
 
     init() {
         preset         = Preset(rawValue: ud.string(forKey: Keys.preset) ?? "") ?? .original
-        customLayout   = loadJSON(Keys.customLayout) ?? .original
+        customLayout   = Self.loadJSON(Keys.customLayout) ?? .original
         separatorChar  = ud.string(forKey: Keys.separatorChar) ?? "·"
         fontSize       = FontSize(rawValue: ud.string(forKey: Keys.fontSize) ?? "") ?? .medium
         opacity        = ud.object(forKey: Keys.opacity) as? Double ?? 1.0
-        theme          = Theme(rawValue: ud.string(forKey: Keys.theme) ?? "") ?? .light
+        theme          = Theme(rawValue: ud.string(forKey: Keys.theme) ?? "") ?? .system
         maxSessions    = ud.object(forKey: Keys.maxSessions) as? Int ?? 5
         minStateFilter = MinStateFilter(rawValue: ud.string(forKey: Keys.minStateFilter) ?? "") ?? .all
         groupByKind    = ud.bool(forKey: Keys.groupByKind)
-        hiddenKinds    = Set((loadJSON(Keys.hiddenKinds) as [String]? ?? []).compactMap(AgentKind.init(rawValue:)))
-        iconChoices    = loadJSON(Keys.iconChoices) ?? [:]
+        hiddenKinds    = Set((Self.loadJSON(Keys.hiddenKinds) as [String]? ?? []).compactMap(AgentKind.init(rawValue:)))
+        iconChoices    = Self.loadJSON(Keys.iconChoices) ?? [:]
     }
 
     private func saveJSON<T: Encodable>(_ key: String, _ value: T) {
         ud.set(try? JSONEncoder().encode(value), forKey: key)
     }
-}
 
-private func loadJSON<T: Decodable>(_ key: String) -> T? {
-    guard let data = UserDefaults.standard.data(forKey: key) else { return nil }
-    return try? JSONDecoder().decode(T.self, from: data)
+    private static func loadJSON<T: Decodable>(_ key: String) -> T? {
+        guard let data = UserDefaults.standard.data(forKey: key) else { return nil }
+        return try? JSONDecoder().decode(T.self, from: data)
+    }
 }
