@@ -53,12 +53,20 @@ public final class SessionStore {
         guard let state = StateMapper.state(for: event.agentKind, eventName: event.eventName) else {
             return nil
         }
+        // Resolve a human-readable title from the transcript when available.
+        // Fall back to constructing the path from session-id + cwd because
+        // some Claude Code hook events omit `transcript_path`.
+        let transcriptPath: String? = event.transcriptPath
+            ?? event.project.map { TranscriptReader.inferredPath(sessionId: event.sessionId, cwd: $0) }
+        let resolvedTitle: String? = transcriptPath.flatMap { TranscriptReader.title(at: $0) }
+
         if var existing = byID[event.sessionId] {
             if existing.state != state { existing.stateSince = now }
             existing.state = state
             existing.updatedAt = now
             if let project = event.project { existing.project = project }
             existing.message = event.message
+            if let t = resolvedTitle { existing.title = t }
             byID[event.sessionId] = existing
             return existing
         }
@@ -66,6 +74,7 @@ public final class SessionStore {
             id: event.sessionId,
             agentKind: event.agentKind,
             project: event.project,
+            title: resolvedTitle,
             state: state,
             message: event.message,
             source: .hook,

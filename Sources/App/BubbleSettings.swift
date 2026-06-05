@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 import AgentPetCore
 
 // MARK: - Token types
@@ -17,6 +18,45 @@ enum BubbleToken: String, CaseIterable, Codable, Identifiable {
         case .message:    return "Activity message"
         case .stateLabel: return "State label"
         case .elapsed:    return "Elapsed time"
+        }
+    }
+
+    var shortName: String {
+        switch self {
+        case .dot:        return "Dot"
+        case .icon:       return "Icon"
+        case .title:      return "Title"
+        case .project:    return "Project"
+        case .separator:  return "Sep"
+        case .message:    return "Message"
+        case .stateLabel: return "State"
+        case .elapsed:    return "Elapsed"
+        }
+    }
+
+    var chipSymbol: String {
+        switch self {
+        case .dot:        return "circle.fill"
+        case .icon:       return "sparkle"
+        case .title:      return "text.quote"
+        case .project:    return "folder.fill"
+        case .separator:  return "arrow.right"
+        case .message:    return "bubble.left.fill"
+        case .stateLabel: return "tag.fill"
+        case .elapsed:    return "clock.fill"
+        }
+    }
+
+    var chipColor: Color {
+        switch self {
+        case .dot:        return .orange
+        case .icon:       return .purple
+        case .title:      return .blue
+        case .project:    return .green
+        case .separator:  return .gray
+        case .message:    return .indigo
+        case .stateLabel: return .yellow
+        case .elapsed:    return .teal
         }
     }
 }
@@ -63,16 +103,6 @@ struct BubbleLayout: Codable, Equatable {
         .init(token: .elapsed,    isVisible: true),
     ])
 
-    static func preset(named preset: BubbleSettings.Preset) -> BubbleLayout {
-        switch preset {
-        case .original: return .original
-        case .standard: return .standard
-        case .detailed: return .detailed
-        case .custom:
-            assertionFailure("preset(named:) should not be called with .custom — use effectiveLayout instead")
-            return .original
-        }
-    }
 }
 
 // MARK: - Icon choice
@@ -139,11 +169,6 @@ enum MinStateFilter: String, CaseIterable, Codable {
 final class BubbleSettings: ObservableObject {
     static let shared = BubbleSettings()
 
-    enum Preset: String, CaseIterable, Codable {
-        case original, standard, detailed, custom
-        var displayName: String { rawValue.capitalized }
-    }
-
     enum FontSize: String, CaseIterable, Codable {
         case small, medium, large
         var primaryPt: CGFloat   { switch self { case .small: 10; case .medium: 12; case .large: 14 } }
@@ -158,9 +183,6 @@ final class BubbleSettings: ObservableObject {
 
     // MARK: Published properties
 
-    @Published var preset: Preset {
-        didSet { ud.set(preset.rawValue, forKey: Keys.preset) }
-    }
     @Published var customLayout: BubbleLayout {
         didSet { saveJSON(Keys.customLayout, customLayout) }
     }
@@ -185,6 +207,11 @@ final class BubbleSettings: ObservableObject {
     @Published var groupByKind: Bool {
         didSet { ud.set(groupByKind, forKey: Keys.groupByKind) }
     }
+    /// When true, sessions sharing the same (agentKind, project) are collapsed
+    /// into a single row with a ×N badge. Turn off to see every session separately.
+    @Published var collapseDuplicates: Bool {
+        didSet { ud.set(collapseDuplicates, forKey: Keys.collapseDuplicates) }
+    }
     @Published var hiddenKinds: Set<AgentKind> {
         didSet { saveJSON(Keys.hiddenKinds, Array(hiddenKinds).map(\.rawValue)) }
     }
@@ -195,9 +222,7 @@ final class BubbleSettings: ObservableObject {
 
     // MARK: Computed
 
-    var effectiveLayout: BubbleLayout {
-        preset == .custom ? customLayout : BubbleLayout.preset(named: preset)
-    }
+    var effectiveLayout: BubbleLayout { customLayout }
 
     func iconChoice(for kind: AgentKind) -> IconChoice {
         iconChoices[kind.rawValue] ?? .brandLogo(kind)
@@ -216,7 +241,6 @@ final class BubbleSettings: ObservableObject {
     private let ud = UserDefaults.standard
 
     private enum Keys {
-        static let preset          = "agentpet.bubble.preset"
         static let customLayout    = "agentpet.bubble.customLayout"
         static let separatorChar   = "agentpet.bubble.separatorChar"
         static let fontSize        = "agentpet.bubble.fontSize"
@@ -224,13 +248,13 @@ final class BubbleSettings: ObservableObject {
         static let theme           = "agentpet.bubble.theme"
         static let maxSessions     = "agentpet.bubble.maxSessions"
         static let minStateFilter  = "agentpet.bubble.minStateFilter"
-        static let groupByKind     = "agentpet.bubble.groupByKind"
-        static let hiddenKinds     = "agentpet.bubble.hiddenKinds"
+        static let groupByKind         = "agentpet.bubble.groupByKind"
+        static let collapseDuplicates  = "agentpet.bubble.collapseDuplicates"
+        static let hiddenKinds         = "agentpet.bubble.hiddenKinds"
         static let iconChoices     = "agentpet.bubble.iconChoices"
     }
 
     init() {
-        preset         = Preset(rawValue: ud.string(forKey: Keys.preset) ?? "") ?? .original
         customLayout   = Self.loadJSON(Keys.customLayout) ?? .original
         separatorChar  = ud.string(forKey: Keys.separatorChar) ?? "·"
         fontSize       = FontSize(rawValue: ud.string(forKey: Keys.fontSize) ?? "") ?? .medium
@@ -238,8 +262,9 @@ final class BubbleSettings: ObservableObject {
         theme          = Theme(rawValue: ud.string(forKey: Keys.theme) ?? "") ?? .system
         maxSessions    = ud.object(forKey: Keys.maxSessions) as? Int ?? 5
         minStateFilter = MinStateFilter(rawValue: ud.string(forKey: Keys.minStateFilter) ?? "") ?? .all
-        groupByKind    = ud.bool(forKey: Keys.groupByKind)
-        hiddenKinds    = Set((Self.loadJSON(Keys.hiddenKinds) as [String]? ?? []).compactMap(AgentKind.init(rawValue:)))
+        groupByKind        = ud.bool(forKey: Keys.groupByKind)
+        collapseDuplicates = ud.object(forKey: Keys.collapseDuplicates) as? Bool ?? true
+        hiddenKinds        = Set((Self.loadJSON(Keys.hiddenKinds) as [String]? ?? []).compactMap(AgentKind.init(rawValue:)))
         iconChoices    = Self.loadJSON(Keys.iconChoices) ?? [:]
     }
 

@@ -38,7 +38,7 @@ struct FloatingPetView: View {
                     AgentBubble(sessions: pet.activeAgentSessions)
                         .transition(AnyTransition.scale(scale: 0.6).combined(with: .opacity))
                 } else if !pet.chatLine.isEmpty {
-                    ChatBubble(text: pet.chatLine)
+                ChatBubble(text: pet.chatLine)
                         .transition(AnyTransition.scale(scale: 0.6).combined(with: .opacity))
                 }
             }
@@ -94,18 +94,23 @@ private struct AgentBubble: View {
             }
         }
 
-        // 3. Collapse sessions that share the same (agentKind, project) into one row
-        var seen: [String: Int] = [:]        // groupKey → index in result
-        var result: [GroupedSession] = []
-        for s in sorted {
-            let projectKey = s.project.map { ($0 as NSString).lastPathComponent } ?? s.id
-            let groupKey = "\(s.agentKind.rawValue)|\(projectKey)"
-            if let idx = seen[groupKey] {
-                result[idx] = GroupedSession(session: result[idx].session, count: result[idx].count + 1)
-            } else {
-                seen[groupKey] = result.count
-                result.append(GroupedSession(session: s, count: 1))
+        // 3. Optionally collapse sessions sharing the same (agentKind, project) into one row.
+        var result: [GroupedSession]
+        if settings.collapseDuplicates {
+            var seen: [String: Int] = [:]
+            result = []
+            for s in sorted {
+                let projectKey = s.project.map { ($0 as NSString).lastPathComponent } ?? s.id
+                let groupKey = "\(s.agentKind.rawValue)|\(projectKey)"
+                if let idx = seen[groupKey] {
+                    result[idx] = GroupedSession(session: result[idx].session, count: result[idx].count + 1)
+                } else {
+                    seen[groupKey] = result.count
+                    result.append(GroupedSession(session: s, count: 1))
+                }
             }
+        } else {
+            result = sorted.map { GroupedSession(session: $0, count: 1) }
         }
 
         // 4. Cap to maxSessions
@@ -128,7 +133,7 @@ private struct AgentBubble: View {
                 .fill(bubbleFill)
                 .frame(width: 12, height: 7)
         }
-        .fixedSize()
+        .frame(maxWidth: 420)
     }
 
     private var bubbleFill: Color {
@@ -275,6 +280,8 @@ private struct ChatBubble: View {
             Text(text)
                 .font(.system(size: 12, weight: .medium))
                 .foregroundStyle(.black.opacity(0.85))
+                .lineLimit(2)
+                .truncationMode(.tail)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 7)
                 .background(Capsule().fill(.white))
@@ -284,7 +291,7 @@ private struct ChatBubble: View {
                 .fill(.white)
                 .frame(width: 12, height: 7)
         }
-        .fixedSize()
+        .frame(maxWidth: 420)
     }
 }
 

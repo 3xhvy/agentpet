@@ -1,16 +1,18 @@
 import SwiftUI
 import AgentPetCore
+import UniformTypeIdentifiers
 
 // MARK: - BubbleSettingsView
 
 struct BubbleSettingsView: View {
     @ObservedObject private var settings = BubbleSettings.shared
+    @State private var dragging: BubbleToken?
     @State private var iconPickerKind: AgentKind?
 
     var body: some View {
         Form {
-            presetSection
-            tokenOrderSection
+            paletteSection
+            canvasSection
             agentIconsSection
             appearanceSection
             filterSection
@@ -21,59 +23,136 @@ struct BubbleSettingsView: View {
         }
     }
 
-    // MARK: Preset
+    // MARK: Available tokens (palette)
 
-    private var presetSection: some View {
-        Section("Layout preset") {
-            Picker("Preset", selection: $settings.preset) {
-                ForEach(BubbleSettings.Preset.allCases, id: \.self) { p in
-                    Text(p.displayName).tag(p)
-                }
-            }
-            .pickerStyle(.segmented)
-            .labelsHidden()
+    private var inactiveTokens: [BubbleToken] {
+        BubbleToken.allCases.filter { token in
+            !settings.customLayout.tokens.contains { $0.token == token && $0.isVisible }
         }
     }
 
-    // MARK: Token Order
+    private var activeTokenItems: [BubbleTokenItem] {
+        settings.customLayout.tokens.filter { $0.isVisible }
+    }
 
-    @ViewBuilder
-    private var tokenOrderSection: some View {
-        let isCustom = settings.preset == .custom
+    private var paletteSection: some View {
         Section {
-            List {
-                ForEach($settings.customLayout.tokens) { $item in
-                    HStack(spacing: 10) {
-                        Image(systemName: "line.3.horizontal")
-                            .foregroundStyle(.secondary)
-                            .frame(width: 20)
-                        Toggle(item.token.displayName, isOn: $item.isVisible)
-                            .onChange(of: item.isVisible) { _ in
-                                if settings.preset != .custom {
-                                    settings.preset = .custom
-                                }
-                            }
+            if inactiveTokens.isEmpty {
+                Text("All tokens are active")
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding(.vertical, 4)
+            } else {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(inactiveTokens, id: \.self) { token in
+                            PaletteChip(token: token) { addToken(token) }
+                        }
                     }
-                }
-                .onMove { from, to in
-                    settings.customLayout.tokens.move(fromOffsets: from, toOffset: to)
-                    settings.preset = .custom
+                    .padding(.horizontal, 2)
+                    .padding(.vertical, 2)
                 }
             }
-            .frame(height: CGFloat(settings.customLayout.tokens.count) * 40)
-            .opacity(isCustom ? 1.0 : 0.5)
-            .disabled(!isCustom)
-
-            Button("Reset to Original") {
-                settings.customLayout = .original
-            }
-            .disabled(!isCustom)
         } header: {
-            Text("Token Order")
+            Text("Available tokens")
         } footer: {
-            Text(isCustom
-                 ? "Drag to reorder. Toggle to show or hide."
-                 : "Select \"Custom\" above to edit the token order.")
+            Text("Tap a chip to add it to the bubble layout.")
+        }
+    }
+
+    // MARK: Active canvas + preview
+
+    private var canvasSection: some View {
+        Section {
+            VStack(alignment: .leading, spacing: 0) {
+                // Chip row
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        if activeTokenItems.isEmpty {
+                            Text("Add tokens from above")
+                                .font(.caption)
+                                .foregroundStyle(.tertiary)
+                                .frame(height: 36)
+                        } else {
+                            ForEach(activeTokenItems) { item in
+                                CanvasChip(
+                                    token: item.token,
+                                    isDragging: dragging == item.token
+                                ) {
+                                    removeToken(item.token)
+                                }
+                                .onDrag {
+                                    dragging = item.token
+                                    return NSItemProvider(object: item.token.rawValue as NSString)
+                                }
+                                .onDrop(
+                                    of: [UTType.plainText],
+                                    delegate: ChipDropDelegate(
+                                        target: item.token,
+                                        tokens: $settings.customLayout.tokens,
+                                        dragging: $dragging
+                                    )
+                                )
+                            }
+                        }
+                    }
+                    .padding(.horizontal, 2)
+                    .padding(.vertical, 6)
+                }
+
+                Divider()
+
+                // Live preview
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Preview")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    BubbleRowPreview()
+                }
+                .padding(.vertical, 10)
+
+                Divider()
+
+                // Reset shortcuts
+                HStack(spacing: 8) {
+                    Text("Reset:")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Button("Original") { settings.customLayout = .original }
+                        .controlSize(.small)
+                    Button("Standard") { settings.customLayout = .standard }
+                        .controlSize(.small)
+                    Button("Detailed") { settings.customLayout = .detailed }
+                        .controlSize(.small)
+                    Spacer()
+                }
+                .padding(.vertical, 8)
+            }
+        } header: {
+            Text("Bubble layout")
+        } footer: {
+            Text("Drag chips to reorder · × to remove")
+        }
+    }
+
+    // MARK: Helpers
+
+    private func addToken(_ token: BubbleToken) {
+        withAnimation(.easeOut(duration: 0.18)) {
+            if let idx = settings.customLayout.tokens.firstIndex(where: { $0.token == token }) {
+                settings.customLayout.tokens[idx].isVisible = true
+            } else {
+                settings.customLayout.tokens.append(BubbleTokenItem(token: token, isVisible: true))
+            }
+        }
+    }
+
+    private func removeToken(_ token: BubbleToken) {
+        withAnimation(.easeOut(duration: 0.18)) {
+            if let idx = settings.customLayout.tokens.firstIndex(where: { $0.token == token }) {
+                settings.customLayout.tokens[idx].isVisible = false
+            }
         }
     }
 
@@ -165,6 +244,7 @@ struct BubbleSettingsView: View {
             }
 
             Toggle("Group by agent kind", isOn: $settings.groupByKind)
+            Toggle("Collapse duplicate sessions", isOn: $settings.collapseDuplicates)
 
             Section("Hide agents") {
                 ForEach(AgentCatalog.all, id: \.kind) { agent in
@@ -177,6 +257,186 @@ struct BubbleSettingsView: View {
                     ))
                 }
             }
+        }
+    }
+}
+
+// MARK: - Palette Chip
+
+private struct PaletteChip: View {
+    let token: BubbleToken
+    let onAdd: () -> Void
+
+    var body: some View {
+        Button(action: onAdd) {
+            HStack(spacing: 5) {
+                Image(systemName: token.chipSymbol)
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(token.chipColor)
+                Text(token.shortName)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(.primary.opacity(0.75))
+                Image(systemName: "plus")
+                    .font(.system(size: 9, weight: .bold))
+                    .foregroundStyle(token.chipColor.opacity(0.7))
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(Capsule().fill(token.chipColor.opacity(0.10)))
+            .overlay(Capsule().strokeBorder(token.chipColor.opacity(0.30), lineWidth: 1))
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+// MARK: - Canvas Chip
+
+private struct CanvasChip: View {
+    let token: BubbleToken
+    let isDragging: Bool
+    let onRemove: () -> Void
+
+    var body: some View {
+        HStack(spacing: 5) {
+            Image(systemName: token.chipSymbol)
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(token.chipColor)
+            Text(token.shortName)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(.primary.opacity(0.9))
+            Button { onRemove() } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 9, weight: .bold))
+                    .foregroundStyle(token.chipColor.opacity(0.6))
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(
+            Capsule().fill(
+                isDragging
+                    ? token.chipColor.opacity(0.25)
+                    : token.chipColor.opacity(0.13)
+            )
+        )
+        .overlay(
+            Capsule().strokeBorder(
+                isDragging ? token.chipColor : token.chipColor.opacity(0.45),
+                lineWidth: isDragging ? 1.5 : 1
+            )
+        )
+        .scaleEffect(isDragging ? 1.05 : 1.0)
+        .animation(.easeInOut(duration: 0.12), value: isDragging)
+    }
+}
+
+// MARK: - Drag & Drop Delegate
+
+private struct ChipDropDelegate: DropDelegate {
+    let target: BubbleToken
+    @Binding var tokens: [BubbleTokenItem]
+    @Binding var dragging: BubbleToken?
+
+    func dropUpdated(info: DropInfo) -> DropProposal? {
+        .init(operation: .move)
+    }
+
+    func performDrop(info: DropInfo) -> Bool {
+        dragging = nil
+        return true
+    }
+
+    func dropEntered(info: DropInfo) {
+        guard let source = dragging, source != target else { return }
+        let visibleIndices = tokens.indices.filter { tokens[$0].isVisible }
+        guard let fromPos = visibleIndices.first(where: { tokens[$0].token == source }),
+              let toPos   = visibleIndices.first(where: { tokens[$0].token == target })
+        else { return }
+        withAnimation(.easeInOut(duration: 0.15)) {
+            tokens.move(
+                fromOffsets: IndexSet(integer: fromPos),
+                toOffset: toPos > fromPos ? toPos + 1 : toPos
+            )
+        }
+    }
+}
+
+// MARK: - Live Preview Row
+
+/// Renders a mock agent row using the current BubbleSettings, so the user
+/// can see exactly how the bubble will look as they edit the layout.
+private struct BubbleRowPreview: View {
+    @ObservedObject private var settings = BubbleSettings.shared
+
+    private let mockTitle    = "Fix login bug"
+    private let mockProject  = "agentpet"
+    private let mockMessage  = "Editing SettingsModel.swift"
+    private let mockElapsed  = "3m"
+
+    var body: some View {
+        let visible = settings.effectiveLayout.tokens.filter { $0.isVisible }
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(alignment: .center, spacing: 4) {
+                ForEach(visible) { item in
+                    tokenView(for: item.token)
+                }
+                if visible.isEmpty {
+                    Text("(empty)")
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                }
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+        }
+        .background(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(Color(nsColor: .textBackgroundColor).opacity(settings.opacity))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .strokeBorder(Color.primary.opacity(0.1), lineWidth: 1)
+        )
+    }
+
+    @ViewBuilder
+    private func tokenView(for token: BubbleToken) -> some View {
+        switch token {
+        case .dot:
+            Circle()
+                .fill(Color(red: 0.22, green: 0.53, blue: 1.0))
+                .frame(width: 6, height: 6)
+        case .icon:
+            ResolvedIconView(
+                choice: settings.iconChoice(for: .claude),
+                size: settings.fontSize.iconPt
+            )
+        case .title:
+            Text(mockTitle)
+                .font(.system(size: settings.fontSize.primaryPt, weight: .semibold))
+                .lineLimit(1)
+        case .project:
+            Text(mockProject)
+                .font(.system(size: settings.fontSize.primaryPt, weight: .medium))
+                .lineLimit(1)
+        case .separator:
+            Text(settings.separatorChar)
+                .font(.system(size: settings.fontSize.primaryPt))
+                .foregroundStyle(.secondary)
+        case .message:
+            Text(mockMessage)
+                .font(.system(size: settings.fontSize.primaryPt, weight: .medium))
+                .lineLimit(1)
+        case .stateLabel:
+            Text("Working")
+                .font(.system(size: settings.fontSize.secondaryPt))
+                .foregroundStyle(.secondary)
+        case .elapsed:
+            Text(mockElapsed)
+                .font(.system(size: settings.fontSize.secondaryPt))
+                .foregroundStyle(.tertiary)
+                .monospacedDigit()
         }
     }
 }
