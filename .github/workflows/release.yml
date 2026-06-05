@@ -13,6 +13,9 @@ jobs:
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Fetch full history so we can push back to main after the tag.
+          fetch-depth: 0
 
       - name: Select Xcode 16 (Swift 6)
         run: sudo xcode-select -s /Applications/Xcode_16.app
@@ -26,13 +29,17 @@ jobs:
         env:
           CERT: ${{ secrets.MACOS_CERT_P12 }}
 
-      - name: Build DMG (sign + notarize if secrets present)
+      - name: Build DMG (sign + notarize + Sparkle-sign if secrets present)
         run: ./scripts/ci-dmg.sh
         env:
           SIGN_IDENTITY: ${{ secrets.MACOS_SIGN_IDENTITY }}
           AC_API_KEY_P8: ${{ secrets.AC_API_KEY_P8 }}
           AC_KEY_ID: ${{ secrets.AC_KEY_ID }}
           AC_ISSUER_ID: ${{ secrets.AC_ISSUER_ID }}
+          # EdDSA private key for Sparkle's sign_update tool. Generate once with
+          # `sign_update --generate-keys` and store the private key as this secret.
+          # The matching public key goes in SUPublicEDKey in scripts/AppInfo.plist.
+          SPARKLE_ED_PRIVATE_KEY: ${{ secrets.SPARKLE_ED_PRIVATE_KEY }}
 
       - name: Publish to GitHub Release
         env:
@@ -41,3 +48,73 @@ jobs:
           gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 \
             || gh release create "$GITHUB_REF_NAME" --title "AgentPet $GITHUB_REF_NAME" --generate-notes
           gh release upload "$GITHUB_REF_NAME" build/*.dmg --clobber
+
+      - name: Update appcast.xml and push to main
+        # Only runs when the Sparkle signing step produced attrs (i.e. the private
+        # key secret is set). Without attrs there is no valid signature to publish.
+        if: ${{ env.SPARKLE_KEY != '' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SPARKLE_KEY: ${{ secrets.SPARKLE_ED_PRIVATE_KEY }}
+        run: |
+          if [ ! -f build/sparkle-attrs.txt ]; then
+            echo "build/sparkle-attrs.txt not found; skipping appcast update"
+            exit 0
+          fi
+
+          VERSION="$(/usr/libexec/PlistBuddy -c 'Print CFBundleShortVersionString' scripts/AppInfo.plist)"
+          BUILD="$(/usr/libexec/PlistBuddy -c 'Print CFBundleVersion' scripts/AppInfo.plist)"
+          DMG="build/AgentPet-$VERSION.dmg"
+          ATTRS="$(cat build/sparkle-attrs.txt)"
+
+          # Parse edSignature and length from "sparkle:edSignature="X==" length="N""
+          SIG="$(echo "$ATTRS" | python3 -c "import sys,re; m=re.search(r'sparkle:edSignature=\"([^\"]+)\"', sys.stdin.read()); print(m.group(1) if m else '')")"
+          LENGTH="$(echo "$ATTRS" | python3 -c "import sys,re; m=re.search(r'length=\"([^\"]+)\"', sys.stdin.read()); print(m.group(1) if m else '')")"
+
+          if [ -z "$SIG" ] || [ -z "$LENGTH" ]; then
+            echo "Could not parse Sparkle attrs; skipping appcast update"
+            exit 0
+          fi
+
+          TODAY="$(date -u '+%a, %d %b %Y %H:%M:%S +0000')"
+
+          # Switch to main to apply the appcast change on top of the latest commit.
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout main
+          git pull --rebase origin main
+
+          python3 - "$VERSION" "$BUILD" "$SIG" "$LENGTH" "$TODAY" <<'PYEOF'
+          import sys
+
+          version, build, sig, length, date = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5]
+
+          new_item = (
+              "        <item>\n"
+              f"            <title>{version}</title>\n"
+              f"            <pubDate>{date}</pubDate>\n"
+              f"            <sparkle:releaseNotesLink>https://github.com/ntd4996/agentpet/releases/tag/v{version}</sparkle:releaseNotesLink>\n"
+              f"            <sparkle:version>{build}</sparkle:version>\n"
+              f"            <sparkle:shortVersionString>{version}</sparkle:shortVersionString>\n"
+              "            <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>\n"
+              f"            <enclosure url=\"https://github.com/ntd4996/agentpet/releases/download/v{version}/AgentPet-{version}.dmg\"\n"
+              f"                       sparkle:edSignature=\"{sig}\" length=\"{length}\" type=\"application/octet-stream\" />\n"
+              "        </item>"
+          )
+
+          with open("docs/appcast.xml", "r") as f:
+              content = f.read()
+
+          # Prepend new item before the first existing <item> so newest is first.
+          content = content.replace("        <item>", new_item + "\n        <item>", 1)
+
+          with open("docs/appcast.xml", "w") as f:
+              f.write(content)
+
+          print(f"Inserted appcast entry for {version} (build {build})")
+          PYEOF
+
+          git add docs/appcast.xml
+          git diff --cached --quiet && echo "appcast unchanged; nothing to commit" && exit 0
+          git commit -m "chore: update appcast for v$VERSION"
+          git push origin main

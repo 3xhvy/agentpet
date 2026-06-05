@@ -14,6 +14,10 @@ struct AgentPetApp: App {
 /// Runs the app as a menu bar accessory (no Dock icon) and boots the daemon.
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
+    // Held strongly so the Sparkle updater delegate and background timers are
+    // never deallocated for the lifetime of the app.
+    private var updater: UpdaterController?
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
         ImagePetStore.shared.reload()
@@ -24,7 +28,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         PetWindowController.shared.start()
         AppDaemon.shared.start()
         SettingsModel.shared.migrateInstalledHooksIfNeeded()
-        _ = UpdaterController.shared
+        SettingsModel.shared.repairStaleHookPathsIfNeeded()
+        updater = UpdaterController.shared
         StatusBarController.shared.start()
         DefaultPetBootstrap.installIfNeeded()
         SettingsWindowController.shared.showOnFirstLaunch()

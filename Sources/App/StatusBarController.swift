@@ -189,6 +189,27 @@ final class StatusBarController: NSObject, ObservableObject {
         if popover.isShown { popover.performClose(nil) }
         popover.show(relativeTo: rect, of: view, preferredEdge: edge)
     }
+
+    // MARK: - Deferred close actions
+
+    /// Action to run once the popover finishes its close animation.
+    /// Use this instead of `DispatchQueue.main.asyncAfter` so the action fires
+    /// at the exact moment the popover delegate confirms it is closed.
+    private var pendingCloseAction: (() -> Void)?
+
+    /// Closes the popover and invokes `action` only after the close animation
+    /// has fully completed (via `NSPopoverDelegate.popoverDidClose`).
+    func closeAndThen(_ action: @escaping () -> Void) {
+        pendingCloseAction = action
+        if popover.isShown {
+            popover.performClose(nil)
+        } else {
+            // Already closed — fire immediately.
+            let pending = pendingCloseAction
+            pendingCloseAction = nil
+            pending?()
+        }
+    }
 }
 
 extension StatusBarController: NSPopoverDelegate {
@@ -203,5 +224,9 @@ extension StatusBarController: NSPopoverDelegate {
             NSEvent.removeMonitor(monitor)
             outsideClickMonitor = nil
         }
+        // Fire any deferred action now that the close animation has finished.
+        let pending = pendingCloseAction
+        pendingCloseAction = nil
+        pending?()
     }
 }

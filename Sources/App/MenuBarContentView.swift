@@ -131,19 +131,23 @@ struct MenuContentView: View {
 
     // MARK: Footer
 
+    @ObservedObject private var updater = UpdaterController.shared
+
     private var footer: some View {
         HStack {
             FooterButton(icon: "gearshape", label: "Settings") {
-                dismiss()
-                // Open after the popover finishes closing so the window
-                // reliably comes to the front.
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                // Use closeAndThen so the window appears only after the popover
+                // animation fully completes — no race, no overlap.
+                StatusBarController.shared.closeAndThen {
                     SettingsWindowController.shared.show()
                 }
             }
-            FooterButton(icon: "arrow.triangle.2.circlepath", label: "Updates") {
-                dismiss()
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+            FooterButton(
+                icon: "arrow.triangle.2.circlepath",
+                label: "Updates",
+                badge: updater.updatePending
+            ) {
+                StatusBarController.shared.closeAndThen {
                     UpdaterController.shared.checkForUpdates()
                 }
             }
@@ -159,12 +163,21 @@ struct MenuContentView: View {
 private struct FooterButton: View {
     let icon: String
     let label: String
+    var badge: Bool = false
     let action: () -> Void
 
     var body: some View {
         Button(action: action) {
             HStack(spacing: 5) {
-                Image(systemName: icon)
+                ZStack(alignment: .topTrailing) {
+                    Image(systemName: icon)
+                    if badge {
+                        Circle()
+                            .fill(Color.orange)
+                            .frame(width: 6, height: 6)
+                            .offset(x: 4, y: -4)
+                    }
+                }
                 Text(label)
             }
             .font(.system(size: 12, weight: .medium))

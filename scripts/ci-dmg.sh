@@ -11,7 +11,22 @@ VERSION="$(/usr/libexec/PlistBuddy -c 'Print CFBundleShortVersionString' scripts
 ./scripts/build-app.sh release
 
 if [ -n "${SIGN_IDENTITY:-}" ]; then
-    echo "==> Signing with Developer ID"
+    echo "==> Signing with Developer ID (inside-out: Sparkle XPCs first)"
+    # Sparkle ships nested XPC services that must be signed before the outer
+    # framework and app, otherwise deep verification fails at runtime.
+    SPARKLE="$APP/Contents/Frameworks/Sparkle.framework"
+    if [ -d "$SPARKLE" ]; then
+        SV="$SPARKLE/Versions/B"
+        for nested in \
+            "$SV/XPCServices/Downloader.xpc" \
+            "$SV/XPCServices/Installer.xpc" \
+            "$SV/Autoupdate" \
+            "$SV/Updater.app"; do
+            [ -e "$nested" ] && codesign --force --options runtime --timestamp \
+                --sign "$SIGN_IDENTITY" "$nested"
+        done
+        codesign --force --options runtime --timestamp --sign "$SIGN_IDENTITY" "$SPARKLE"
+    fi
     codesign --force --options runtime --timestamp --sign "$SIGN_IDENTITY" "$APP/Contents/MacOS/agentpet"
     codesign --force --options runtime --timestamp --sign "$SIGN_IDENTITY" "$APP"
     codesign --verify --strict "$APP"
@@ -34,3 +49,22 @@ fi
 
 echo "==> Built $DMG"
 shasum -a 256 "$DMG"
+
+# Generate the EdDSA signature for the Sparkle appcast if the private key is
+# provided via SPARKLE_ED_PRIVATE_KEY. The sign_update tool ships inside the
+# Sparkle binary artifact that SwiftPM downloads during the build.
+if [ -n "${SPARKLE_ED_PRIVATE_KEY:-}" ]; then
+    echo "==> Signing DMG for Sparkle appcast"
+    SIGN_UPDATE="$(find .build/artifacts -name sign_update -path '*Sparkle*' 2>/dev/null | head -1)"
+    if [ -z "$SIGN_UPDATE" ]; then
+        echo "warning: sign_update not found; run swift build first" >&2
+    else
+        KEY_FILE="$(mktemp)"
+        echo "$SPARKLE_ED_PRIVATE_KEY" > "$KEY_FILE"
+        ED_ATTRS="$("$SIGN_UPDATE" --ed-key-file "$KEY_FILE" "$DMG")"
+        rm -f "$KEY_FILE"
+        # Write attrs to a file so the CI workflow can read them without re-parsing stdout.
+        echo "$ED_ATTRS" > build/sparkle-attrs.txt
+        echo "Sparkle attrs: $ED_ATTRS"
+    fi
+fi
