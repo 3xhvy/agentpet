@@ -44,7 +44,8 @@ struct FloatingPetView: View {
     }
 }
 
-/// A speech bubble with a little downward tail.
+/// A speech bubble with a little downward tail. Supports multi-line text
+/// (used for the agent bullet list) via left-alignment and a capped width.
 private struct ChatBubble: View {
     let text: String
 
@@ -53,10 +54,13 @@ private struct ChatBubble: View {
             Text(text)
                 .font(.system(size: 12, weight: .medium))
                 .foregroundStyle(.black.opacity(0.85))
+                .multilineTextAlignment(.leading)
+                .frame(maxWidth: 280, alignment: .leading)
+                .fixedSize(horizontal: false, vertical: true)
                 .padding(.horizontal, 12)
-                .padding(.vertical, 7)
-                .background(Capsule().fill(.white))
-                .overlay(Capsule().strokeBorder(.black.opacity(0.06), lineWidth: 1))
+                .padding(.vertical, 8)
+                .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(.white))
+                .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(.black.opacity(0.06), lineWidth: 1))
                 .shadow(color: .black.opacity(0.18), radius: 5, y: 2)
             Triangle()
                 .fill(.white)

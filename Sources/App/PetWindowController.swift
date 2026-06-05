@@ -14,6 +14,7 @@ final class PetWindowController: ObservableObject {
 
     private var panel: NSPanel?
     private var sizeCancellable: AnyCancellable?
+    private var chatLineCancellable: AnyCancellable?
     private var rightClickMonitor: Any?
     private var screenObserver: Any?
 
@@ -38,9 +39,14 @@ final class PetWindowController: ObservableObject {
         placeInitially(size: size)
         applyVisibility(isVisible)
 
-        // On size change, resize in place (keep the pet where the user put it).
-        sizeCancellable = PetController.shared.$petPoint.sink { [weak self] point in
-            self?.resizeInPlace(to: PetController.windowSize(forPoint: point))
+        // On pet-size change, resize in place (keep the pet where the user put it).
+        sizeCancellable = PetController.shared.$petPoint.sink { [weak self] _ in
+            self?.resizeInPlace(to: PetController.shared.windowSize)
+        }
+
+        // On chat-line count change (agents added/removed), resize for new bubble height.
+        chatLineCancellable = PetController.shared.$chatLineCount.sink { [weak self] _ in
+            self?.resizeInPlace(to: PetController.shared.windowSize)
         }
 
         // If displays change (e.g. a monitor is unplugged), keep the pet on screen.

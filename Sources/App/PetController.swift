@@ -28,21 +28,24 @@ final class PetController: ObservableObject {
     static let maxPoint: Double = 240
     static let presets: [(String, Double)] = [("S", 84), ("M", 120), ("L", 168)]
 
-    /// Floating window size for a sprite point size (room for the bubble above).
-    static func windowSize(forPoint point: Double) -> CGSize {
-        CGSize(width: point + 110, height: point + 64)
+    /// Floating window size. Width is wide enough for agent-ticker lines;
+    /// height grows with the number of lines in the bubble.
+    static func windowSize(forPoint point: Double, lineCount: Int = 1) -> CGSize {
+        let count = max(lineCount, 1)
+        let bubbleH = CGFloat(count) * 22 + 16   // 22pt per line + top/bottom padding
+        return CGSize(
+            width: max(point + 110, 320),         // 320pt fits typical agent lines
+            height: point + bubbleH + 28          // 28pt for triangle + spacing + margin
+        )
     }
-    var windowSize: CGSize { Self.windowSize(forPoint: petPoint) }
+    var windowSize: CGSize { Self.windowSize(forPoint: petPoint, lineCount: max(chatLineCount, 1)) }
 
     private var lastResolved: PetMood = .idle
     private var latestSessions: [AgentSession] = []
     private var celebrateTimer: Timer?
 
-    // Ticker state
-    private var tickerIndex: Int = 0
-    private var tickerSessions: [AgentSession] = []
-    private var tickerTimer: Timer?
-    private static let tickerInterval: TimeInterval = 4.0
+    /// Number of active agent lines currently shown; drives window height.
+    @Published private(set) var chatLineCount: Int = 0
 
     private static let petKey = "agentpet.selectedPetID"
     private static let chatKey = "agentpet.showChat"
@@ -96,7 +99,7 @@ final class PetController: ObservableObject {
         defer { lastResolved = resolved }
 
         if resolved == .done && lastResolved != .done {
-            stopTicker()
+            chatLineCount = 0
             setMood(.celebrate)
             celebrateTimer?.invalidate()
             celebrateTimer = Timer.scheduledTimer(withTimeInterval: Self.celebrateDuration, repeats: false) { _ in
@@ -111,9 +114,9 @@ final class PetController: ObservableObject {
         setMood(resolved)
 
         if resolved == .working || resolved == .waiting {
-            applyTickerSessions(sessions)
+            buildAgentChatLine(sessions: sessions)
         } else {
-            stopTicker()
+            chatLineCount = 0
         }
     }
 
@@ -132,10 +135,11 @@ final class PetController: ObservableObject {
             StatusBarController.shared.refreshTitle()
             return
         }
-        // During working/waiting the ticker owns chatLine; fall back to PetChat
-        // for celebrate/done where the ticker is stopped.
-        if (mood == .working || mood == .waiting) && !tickerSessions.isEmpty {
-            showCurrentTickerLine()
+        // During working/waiting the agent list owns chatLine; fall back to
+        // PetChat for celebrate/done.
+        if (mood == .working || mood == .waiting) && chatLineCount > 0 {
+            // chatLine already set by buildAgentChatLine — just refresh status bar
+            StatusBarController.shared.refreshTitle()
             return
         }
         let pool = ChatSettings.shared.lines(for: mood)
@@ -148,51 +152,19 @@ final class PetController: ObservableObject {
         StatusBarController.shared.refreshTitle()
     }
 
-    // MARK: - Ticker
+    // MARK: - Agent list
 
-    private func applyTickerSessions(_ sessions: [AgentSession]) {
-        let active = sessions.filter { $0.state != .idle && $0.state != .registered }
-        let sorted = TickerFormatter.sorted(active)
-        let changed = sorted.map(\.id) != tickerSessions.map(\.id)
-        tickerSessions = sorted
-        if sorted.isEmpty {
-            stopTicker()
+    /// Builds a bullet-list chatLine from all active sessions, sorted by urgency.
+    private func buildAgentChatLine(sessions: [AgentSession]) {
+        let active = TickerFormatter.sorted(
+            sessions.filter { $0.state != .idle && $0.state != .registered }
+        )
+        chatLineCount = active.count
+        if active.isEmpty {
             chatLine = ""
-            StatusBarController.shared.refreshTitle()
-            return
+        } else {
+            chatLine = active.map { "• \(TickerFormatter.line(for: $0))" }.joined(separator: "\n")
         }
-        if changed { tickerIndex = 0 }
-        showCurrentTickerLine()
-        startTickerIfNeeded()
-    }
-
-    private func startTickerIfNeeded() {
-        guard tickerTimer == nil else { return }
-        tickerTimer = Timer.scheduledTimer(withTimeInterval: Self.tickerInterval, repeats: true) { _ in
-            Task { @MainActor [weak self] in self?.advanceTicker() }
-        }
-    }
-
-    private func stopTicker() {
-        tickerTimer?.invalidate()
-        tickerTimer = nil
-        tickerIndex = 0
-        tickerSessions = []
-    }
-
-    private func advanceTicker() {
-        guard !tickerSessions.isEmpty else { stopTicker(); return }
-        tickerIndex = (tickerIndex + 1) % tickerSessions.count
-        showCurrentTickerLine()
-    }
-
-    private func showCurrentTickerLine() {
-        guard showChat, !tickerSessions.isEmpty else {
-            chatLine = ""
-            StatusBarController.shared.refreshTitle()
-            return
-        }
-        chatLine = TickerFormatter.line(for: tickerSessions[tickerIndex % tickerSessions.count])
         StatusBarController.shared.refreshTitle()
     }
 }
