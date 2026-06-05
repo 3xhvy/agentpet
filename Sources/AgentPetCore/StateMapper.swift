@@ -67,6 +67,12 @@ public enum StateMapper {
             case "session.idle": return .done
             default: return nil
             }
+        case .antigravity:
+            switch eventName {
+            case "PreInvocation", "PreToolUse", "PostToolUse", "PostInvocation": return .working
+            case "Stop": return .done
+            default: return nil
+            }
         case .cli, .unknown:
             return nil
         }
