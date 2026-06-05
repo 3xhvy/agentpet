@@ -46,6 +46,8 @@ final class PetController: ObservableObject {
 
     /// Number of active agent lines currently shown; drives window height.
     @Published private(set) var chatLineCount: Int = 0
+    /// Sorted active sessions for the structured desktop bubble. Empty when idle/done/celebrate.
+    @Published private(set) var activeAgentSessions: [AgentSession] = []
 
     private static let petKey = "agentpet.selectedPetID"
     private static let chatKey = "agentpet.showChat"
@@ -100,6 +102,7 @@ final class PetController: ObservableObject {
 
         if resolved == .done && lastResolved != .done {
             chatLineCount = 0
+            activeAgentSessions = []
             setMood(.celebrate)
             celebrateTimer?.invalidate()
             celebrateTimer = Timer.scheduledTimer(withTimeInterval: Self.celebrateDuration, repeats: false) { _ in
@@ -117,6 +120,7 @@ final class PetController: ObservableObject {
             buildAgentChatLine(sessions: sessions)
         } else {
             chatLineCount = 0
+            activeAgentSessions = []
         }
     }
 
@@ -154,15 +158,17 @@ final class PetController: ObservableObject {
 
     // MARK: - Agent list
 
-    /// Builds a bullet-list chatLine from all active sessions, sorted by urgency.
+    /// Builds the structured session list and a plain-text fallback chatLine.
     private func buildAgentChatLine(sessions: [AgentSession]) {
         let active = TickerFormatter.sorted(
             sessions.filter { $0.state != .idle && $0.state != .registered }
         )
+        activeAgentSessions = active
         chatLineCount = active.count
         if active.isEmpty {
             chatLine = ""
         } else {
+            // Plain-text fallback used by the menu bar chat pill (lineLimit(1) shows first line).
             chatLine = active.map { "• \(TickerFormatter.line(for: $0))" }.joined(separator: "\n")
         }
         StatusBarController.shared.refreshTitle()

@@ -1,4 +1,5 @@
 import SwiftUI
+import AgentPetCore
 
 /// The pet sprite alone (imported pack, reacting to mood). Shows a paw
 /// placeholder if no pet is selected yet.
@@ -32,20 +33,126 @@ struct FloatingPetView: View {
 
     var body: some View {
         VStack(spacing: 2) {
-            if pet.showChat && !pet.chatLine.isEmpty && pet.selectedPetID != nil {
-                ChatBubble(text: pet.chatLine)
-                    .transition(.scale(scale: 0.6).combined(with: .opacity))
+            if pet.showChat && pet.selectedPetID != nil {
+                if !pet.activeAgentSessions.isEmpty {
+                    AgentBubble(sessions: pet.activeAgentSessions)
+                        .transition(AnyTransition.scale(scale: 0.6).combined(with: .opacity))
+                } else if !pet.chatLine.isEmpty {
+                    ChatBubble(text: pet.chatLine)
+                        .transition(AnyTransition.scale(scale: 0.6).combined(with: .opacity))
+                }
             }
             PetView(size: pet.petPoint)
         }
         .frame(width: pet.windowSize.width, height: pet.windowSize.height, alignment: .bottom)
         .animation(.spring(response: 0.35, dampingFraction: 0.7), value: pet.chatLine)
+        .animation(.spring(response: 0.35, dampingFraction: 0.7), value: pet.activeAgentSessions.count)
         .animation(.easeInOut, value: pet.showChat)
     }
 }
 
-/// A speech bubble with a little downward tail. Supports multi-line text
-/// (used for the agent bullet list) via left-alignment and a capped width.
+// MARK: - Agent Bubble (structured rows for working/waiting)
+
+/// A speech bubble showing one row per active agent, with a colored state dot
+/// and a unique SF Symbol icon identifying the agent type.
+private struct AgentBubble: View {
+    let sessions: [AgentSession]
+
+    var body: some View {
+        VStack(spacing: 0) {
+            VStack(alignment: .leading, spacing: 5) {
+                ForEach(sessions) { session in
+                    AgentRow(session: session)
+                }
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 9)
+            .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(.white))
+            .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(.black.opacity(0.06), lineWidth: 1))
+            .shadow(color: .black.opacity(0.18), radius: 5, y: 2)
+            Triangle()
+                .fill(.white)
+                .frame(width: 12, height: 7)
+        }
+        .fixedSize()
+    }
+}
+
+private struct AgentRow: View {
+    let session: AgentSession
+
+    var body: some View {
+        HStack(spacing: 5) {
+            // State dot — color signals urgency
+            Circle()
+                .fill(stateDotColor)
+                .frame(width: 6, height: 6)
+
+            // Agent icon — SF Symbol unique to each agent kind
+            Image(systemName: agentSymbol)
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(agentColor)
+                .frame(width: 14, alignment: .center)
+
+            // Project → activity
+            Text(rowText)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(.black.opacity(0.82))
+                .lineLimit(1)
+                .truncationMode(.tail)
+        }
+    }
+
+    private var rowText: String {
+        let project = session.project.map { ($0 as NSString).lastPathComponent } ?? session.id
+        let msg: String
+        if let m = session.message, !m.trimmingCharacters(in: .whitespaces).isEmpty {
+            msg = m
+        } else {
+            msg = session.state.rawValue.capitalized
+        }
+        return "\(project) → \(msg)"
+    }
+
+    private var stateDotColor: Color {
+        switch session.state {
+        case .waiting:              return .orange
+        case .working:              return Color(red: 0.22, green: 0.53, blue: 1.0)  // vivid blue
+        case .done:                 return Color(red: 0.13, green: 0.77, blue: 0.37) // green
+        case .idle, .registered:    return .gray
+        }
+    }
+
+    private var agentSymbol: String {
+        switch session.agentKind {
+        case .claude:    return "sparkles"
+        case .cursor:    return "cursorarrow.rays"
+        case .codex:     return "terminal.fill"
+        case .gemini:    return "sparkle"
+        case .opencode:  return "hammer.fill"
+        case .windsurf:  return "wind"
+        case .cli:       return "terminal"
+        case .unknown:   return "questionmark.circle"
+        }
+    }
+
+    private var agentColor: Color {
+        switch session.agentKind {
+        case .claude:    return Color(red: 0.80, green: 0.47, blue: 0.36)  // Claude copper
+        case .cursor:    return Color(red: 0.10, green: 0.45, blue: 0.95)  // Cursor blue
+        case .codex:     return Color(red: 0.06, green: 0.73, blue: 0.51)  // Codex green
+        case .gemini:    return Color(red: 0.26, green: 0.52, blue: 0.96)  // Google blue
+        case .opencode:  return Color(red: 0.98, green: 0.45, blue: 0.09)  // orange
+        case .windsurf:  return Color(red: 0.02, green: 0.71, blue: 0.83)  // teal
+        case .cli:       return .secondary
+        case .unknown:   return .secondary
+        }
+    }
+}
+
+// MARK: - Simple Chat Bubble (celebrate / done / waiting fallback)
+
+/// A plain speech bubble with a downward tail, used for celebrate/done lines.
 private struct ChatBubble: View {
     let text: String
 
@@ -54,13 +161,10 @@ private struct ChatBubble: View {
             Text(text)
                 .font(.system(size: 12, weight: .medium))
                 .foregroundStyle(.black.opacity(0.85))
-                .multilineTextAlignment(.leading)
-                .frame(maxWidth: 280, alignment: .leading)
-                .fixedSize(horizontal: false, vertical: true)
                 .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-                .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(.white))
-                .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(.black.opacity(0.06), lineWidth: 1))
+                .padding(.vertical, 7)
+                .background(Capsule().fill(.white))
+                .overlay(Capsule().strokeBorder(.black.opacity(0.06), lineWidth: 1))
                 .shadow(color: .black.opacity(0.18), radius: 5, y: 2)
             Triangle()
                 .fill(.white)
