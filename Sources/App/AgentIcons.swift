@@ -5,13 +5,25 @@ import AgentPetCore
 /// Renders the real brand logo for each agent kind as an NSImage from embedded
 /// SVG data. No external dependency or resource bundle — the SVG strings are
 /// compiled into the binary. Falls back to an SF Symbol for unknown kinds.
+///
+/// `NSImage(data:)` does not recognise SVG from raw bytes; macOS needs a `.svg`
+/// file URL to select the SVG renderer. Each icon is written to a temp file once
+/// and cached in memory for all subsequent calls.
 enum AgentIcons {
 
+    // Rendered images are cached inside a nonisolated function to avoid
+    // mutable-global-variable warnings under strict concurrency.
+    nonisolated(unsafe) private static var cache: [AgentKind: NSImage] = [:]
+
     static func image(for kind: AgentKind) -> NSImage? {
+        if let hit = cache[kind] { return hit }
         guard let svg = svgString(for: kind),
               let data = svg.data(using: .utf8) else { return nil }
-        let img = NSImage(data: data)
-        img?.isTemplate = false
+        let url = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent("agentpet-icon-\(kind.rawValue).svg")
+        guard (try? data.write(to: url)) != nil,
+              let img = NSImage(contentsOf: url) else { return nil }
+        cache[kind] = img
         return img
     }
 
@@ -115,27 +127,77 @@ enum AgentIcons {
 
 // MARK: - SwiftUI view
 
-/// Shows the real brand logo for the agent kind; falls back to an SF Symbol
-/// for CLI/unknown sessions that have no registered brand.
+/// Shows the brand logo for the agent kind; thin wrapper over `ResolvedIconView`.
 struct AgentIconView: View {
     let kind: AgentKind
     var size: CGFloat = 14
 
     var body: some View {
-        if let img = AgentIcons.image(for: kind) {
-            Image(nsImage: img)
-                .resizable()
-                .aspectRatio(contentMode: .fit)
-                .frame(width: size, height: size)
-        } else {
-            Image(systemName: fallbackSymbol)
+        ResolvedIconView(choice: .brandLogo(kind), size: size)
+    }
+}
+
+// MARK: - AgentKind identifiable (needed for popover(item:))
+
+extension AgentKind: Identifiable {
+    public var id: String { rawValue }
+}
+
+// MARK: - Curated SF Symbols for the icon picker
+
+extension AgentIcons {
+    /// All AgentKind cases that have embedded SVG brand logos.
+    static let brandKinds: [AgentKind] = [.claude, .cursor, .codex, .gemini, .windsurf, .opencode]
+
+    /// 28 curated SF Symbol names shown in the icon picker.
+    static let curatedSymbols: [String] = [
+        // Code & Terminal
+        "terminal", "chevron.left.forwardslash.chevron.right", "curlybraces", "cpu", "command",
+        // AI & Magic
+        "brain", "wand.and.stars", "sparkles", "bolt",
+        // Workflow
+        "arrow.triangle.2.circlepath", "checklist", "tray.and.arrow.down", "doc.text",
+        // Network
+        "antenna.radiowaves.left.and.right", "network", "wifi", "cloud",
+        // Interface
+        "gear", "slider.horizontal.3", "paintbrush", "theatermasks", "person.crop.circle",
+        // Objects
+        "desktopcomputer", "laptopcomputer", "keyboard", "hammer", "wrench.and.screwdriver",
+        // Extra
+        "eye", "hourglass",
+    ]
+}
+
+// MARK: - ResolvedIconView
+
+/// Renders an `IconChoice` — either a brand SVG logo or an SF Symbol.
+struct ResolvedIconView: View {
+    let choice: IconChoice
+    var size: CGFloat = 14
+
+    var body: some View {
+        switch choice {
+        case .brandLogo(let kind):
+            if let img = AgentIcons.image(for: kind) {
+                Image(nsImage: img)
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(width: size, height: size)
+            } else {
+                Image(systemName: fallback(for: kind))
+                    .font(.system(size: size * 0.8, weight: .medium))
+                    .foregroundStyle(.secondary)
+                    .frame(width: size, height: size)
+            }
+        case .sfSymbol(let name):
+            Image(systemName: name)
                 .font(.system(size: size * 0.8, weight: .medium))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(.primary)
                 .frame(width: size, height: size)
         }
     }
 
-    private var fallbackSymbol: String {
+    private func fallback(for kind: AgentKind) -> String {
         switch kind {
         case .cli:     return "terminal"
         case .unknown: return "questionmark.circle"
