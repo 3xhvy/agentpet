@@ -44,12 +44,12 @@ A `BubbleLayout` is an ordered list of all 8 tokens. Rendering iterates the list
 
 ### 1.3 Presets
 
-| Preset | Visible tokens (in order) |
-|--------|--------------------------|
-| **Minimal** | dot · icon · project · message |
-| **Standard** | dot · icon · title · project · separator · message |
-| **Detailed** | dot · icon · title · project · separator · message · stateLabel · elapsed |
-| **Custom** | User-defined; starts as a copy of Standard on first use |
+| Preset | Visible tokens (in order) | Notes |
+|--------|--------------------------|-------|
+| **Original** | dot · icon · project · separator · message | The default. Matches the bubble exactly as it looked before any display changes were added. |
+| **Standard** | dot · icon · title · project · separator · message | Adds conversation title above the project line. |
+| **Detailed** | dot · icon · title · project · separator · message · stateLabel · elapsed | All informational tokens. |
+| **Custom** | User-defined; starts as a copy of Original on first use | |
 
 Presets are static constants on `BubbleLayout`. The Custom layout is persisted independently.
 
@@ -60,13 +60,13 @@ Presets are static constants on `BubbleLayout`. The Custom layout is persisted i
 final class BubbleSettings: ObservableObject {
     static let shared = BubbleSettings()
 
-    enum Preset: String, CaseIterable { case minimal, standard, detailed, custom }
+    enum Preset: String, CaseIterable { case original, standard, detailed, custom }
     enum FontSize: String, CaseIterable { case small, medium, large }
     enum Theme: String, CaseIterable { case light, dark, system }
 
     // Preset selection
-    @Published var preset: Preset               // default: .standard
-    @Published var customLayout: BubbleLayout   // default: copy of Standard
+    @Published var preset: Preset               // default: .original
+    @Published var customLayout: BubbleLayout   // default: copy of Original
 
     // Appearance
     @Published var separatorChar: String        // default: "·"; options: "·" "→" "|" " "
@@ -140,9 +140,9 @@ A `BubbleSettingsView` SwiftUI view added as a new tab in the existing `Settings
 
 ### 2.2 Behavior Details
 
-- **Preset segmented control:** Switching immediately applies the preset to the live bubble (no separate Apply button). The token list below updates to show that preset's layout as a non-interactive preview.
+- **Preset segmented control:** Four segments: `Original | Standard | Detailed | Custom`. Switching immediately applies the preset to the live bubble (no separate Apply button). The token list below updates to show that preset's layout as a non-interactive preview.
 - **Custom token list:** Shown as interactive (drag-drop + toggles) only when Custom is selected. For other presets, the same list is shown read-only to communicate what that preset contains.
-- **Reset to Standard button:** Copies `BubbleLayout.standard` into `customLayout` and saves.
+- **Reset to Original button:** Copies `BubbleLayout.original` into `customLayout` and saves.
 - **Separator picker:** Segmented control with 4 options. The selected character is used for `separator` tokens in the rendered row; also displayed as a preview label on the segmented button.
 - **Min state picker:** Options: "All states" (`.registered`), "Working & Waiting", "Working only".
 - **Hide agents checkboxes:** Shows all supported agent kinds (same list as the Integrations tab — installed or not). A hidden kind's sessions are fully suppressed from the bubble.
