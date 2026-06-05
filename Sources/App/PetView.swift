@@ -185,9 +185,7 @@ private struct AgentRow: View {
     private func tokenView(for token: BubbleToken) -> some View {
         switch token {
         case .dot:
-            Circle()
-                .fill(stateDotColor)
-                .frame(width: 6, height: 6)
+            PulsingDot(color: stateDotColor, pulse: session.state == .done)
         case .icon:
             ResolvedIconView(
                 choice: settings.iconChoice(for: session.agentKind),
@@ -292,6 +290,43 @@ private struct ChatBubble: View {
                 .frame(width: 12, height: 7)
         }
         .frame(maxWidth: 420)
+    }
+}
+
+// MARK: - Pulsing dot
+
+/// State dot that flashes when the agent has just finished (done state).
+private struct PulsingDot: View {
+    let color: Color
+    let pulse: Bool
+    @State private var animating = false
+
+    var body: some View {
+        ZStack {
+            if pulse {
+                // Outer ring that expands and fades
+                Circle()
+                    .stroke(color, lineWidth: 1.5)
+                    .frame(width: animating ? 14 : 6, height: animating ? 14 : 6)
+                    .opacity(animating ? 0 : 0.8)
+            }
+            Circle()
+                .fill(color)
+                .frame(width: 6, height: 6)
+        }
+        .frame(width: 14, height: 14)
+        .onAppear { startIfNeeded() }
+        .onChange(of: pulse) { newPulse in
+            if newPulse { startIfNeeded() }
+            else { animating = false }
+        }
+    }
+
+    private func startIfNeeded() {
+        guard pulse else { return }
+        withAnimation(.easeOut(duration: 0.9).repeatForever(autoreverses: false)) {
+            animating = true
+        }
     }
 }
 

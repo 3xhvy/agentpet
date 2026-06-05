@@ -22,6 +22,11 @@ public enum TranscriptReader {
         return result
     }
 
+    /// Clears cached titles — useful after fixing the extraction logic at runtime.
+    public static func clearCache() {
+        cache.removeAll()
+    }
+
     /// Constructs the expected transcript path for a Claude Code session.
     ///
     /// Claude Code stores transcripts at `~/.claude/projects/<sanitized-cwd>/<session-id>.jsonl`
@@ -57,7 +62,7 @@ public enum TranscriptReader {
                 return summary
             }
 
-            // Capture the first user text as a fallback title.
+            // Scan every user event; keep the first that yields real human text.
             if firstUserText == nil, type == "user" {
                 firstUserText = extractUserText(from: json)
             }
@@ -67,23 +72,34 @@ public enum TranscriptReader {
     }
 
     private static func extractUserText(from json: [String: Any]) -> String? {
-        // Claude Code format: message.content is an array of content blocks.
-        if let message = json["message"] as? [String: Any],
-           let contentBlocks = message["content"] as? [[String: Any]] {
-            let text = contentBlocks
-                .compactMap { $0["text"] as? String }
-                .joined(separator: " ")
-                .trimmingCharacters(in: .whitespacesAndNewlines)
-            if !text.isEmpty {
-                return String(text.prefix(60))
+        guard let message = json["message"] as? [String: Any] else { return nil }
+
+        // Array-of-blocks format (tool results, text blocks, etc.)
+        if let blocks = message["content"] as? [[String: Any]] {
+            for block in blocks {
+                // Only plain text blocks — skip tool_result, tool_use, image, etc.
+                guard block["type"] as? String == "text",
+                      let raw = block["text"] as? String else { continue }
+                if let clean = humanReadable(raw) { return clean }
             }
+            return nil
         }
-        // Older / simpler format: content is a plain string.
-        if let message = json["message"] as? [String: Any],
-           let content = message["content"] as? String,
-           !content.trimmingCharacters(in: .whitespaces).isEmpty {
-            return String(content.prefix(60))
+
+        // Plain-string format (common in older / simple sessions).
+        if let raw = message["content"] as? String {
+            return humanReadable(raw)
         }
+
         return nil
+    }
+
+    /// Returns `text` trimmed and capped at 60 chars, or `nil` if it looks like
+    /// a system injection (XML tags such as `<local-command>`, tool wrappers, etc.)
+    private static func humanReadable(_ text: String) -> String? {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        // Skip XML-style system injections ("<local-command>…", "<result>…", etc.)
+        guard !trimmed.hasPrefix("<") else { return nil }
+        return String(trimmed.prefix(60))
     }
 }
