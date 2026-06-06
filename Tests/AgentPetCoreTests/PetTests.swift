@@ -11,9 +11,9 @@ final class MoodResolverTests: XCTestCase {
         XCTAssertEqual(MoodResolver.aggregate([]), .idle)
     }
 
-    func testWorkingWins() {
+    func testWaitingWinsOverWorking() {
         let sessions = [session(.working, id: "a"), session(.waiting, id: "b"), session(.done, id: "c")]
-        XCTAssertEqual(MoodResolver.aggregate(sessions), .working, "running work is prioritised")
+        XCTAssertEqual(MoodResolver.aggregate(sessions), .waiting, "user input is prioritised")
     }
 
     func testWaitingBeatsDone() {
