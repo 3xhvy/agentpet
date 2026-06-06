@@ -43,6 +43,7 @@ final class PetController: ObservableObject {
     private var lastResolved: PetMood = .idle
     private var latestSessions: [AgentSession] = []
     private var celebrateTimer: Timer?
+    private var noticeTimer: Timer?
 
     /// Number of active agent lines currently shown; drives window height.
     @Published private(set) var chatLineCount: Int = 0
@@ -63,6 +64,36 @@ final class PetController: ObservableObject {
 
     func start() {
         // Ticker drives chatLine updates; no separate chat timer needed.
+    }
+
+    func showQuotaWarning(_ event: QuotaWarningEvent) {
+        let now = Date()
+        let warning = AgentSession(
+            id: "quota-\(event.provider.rawValue)-\(event.bucketName)",
+            agentKind: event.provider,
+            project: "Quota",
+            title: event.providerName,
+            state: .waiting,
+            message: event.message,
+            source: .passive,
+            updatedAt: now
+        )
+        let active = TickerFormatter.sorted(
+            latestSessions.filter { $0.state != .idle && $0.state != .registered }
+        )
+        activeAgentSessions = [warning] + active
+        chatLineCount = activeAgentSessions.count
+        chatLine = activeAgentSessions.map { "• \(TickerFormatter.line(for: $0))" }.joined(separator: "\n")
+        setMood(.waiting)
+        noticeTimer?.invalidate()
+        noticeTimer = Timer.scheduledTimer(withTimeInterval: 8, repeats: false) { _ in
+            Task { @MainActor [weak self] in self?.restoreAfterNotice() }
+        }
+    }
+
+    private func restoreAfterNotice() {
+        noticeTimer?.invalidate()
+        update(sessions: latestSessions)
     }
 
     private var sizeAnimTimer: Timer?
@@ -96,24 +127,37 @@ final class PetController: ObservableObject {
 
     /// Called by the daemon whenever the session list changes.
     func update(sessions: [AgentSession]) {
+        let previousStates = Dictionary(uniqueKeysWithValues: latestSessions.map { ($0.id, $0.state) })
         latestSessions = sessions
         let resolved = MoodResolver.aggregate(sessions)
+        let enteredWaiting = sessions.contains { $0.state == .waiting && previousStates[$0.id] != .waiting }
+        let enteredDone = sessions.contains { $0.state == .done && previousStates[$0.id] != .done }
         defer { lastResolved = resolved }
 
-        if resolved == .done && lastResolved != .done {
-            chatLineCount = 0
-            activeAgentSessions = []
-            setMood(.celebrate)
+        if enteredWaiting {
             celebrateTimer?.invalidate()
-            celebrateTimer = Timer.scheduledTimer(withTimeInterval: Self.celebrateDuration, repeats: false) { _ in
-                Task { @MainActor [weak self] in self?.settleAfterCelebrate() }
-            }
+            setMood(.waiting)
+            buildAgentChatLine(sessions: sessions)
             return
         }
-        if mood == .celebrate && resolved == .done {
+
+        if enteredDone || (resolved == .done && lastResolved != .done) {
+            startCelebrateBurst(sessions: sessions, resolved: resolved)
+            return
+        }
+
+        if mood == .celebrate {
+            if resolved == .working || resolved == .waiting {
+                buildAgentChatLine(sessions: sessions)
+            } else if resolved != .done {
+                chatLineCount = 0
+                activeAgentSessions = []
+            }
             return  // let the celebration finish
         }
+
         celebrateTimer?.invalidate()
+        noticeTimer?.invalidate()
         setMood(resolved)
 
         if resolved == .working || resolved == .waiting {
@@ -124,8 +168,29 @@ final class PetController: ObservableObject {
         }
     }
 
+    private func startCelebrateBurst(sessions: [AgentSession], resolved: PetMood) {
+        if resolved == .working || resolved == .waiting {
+            buildAgentChatLine(sessions: sessions)
+        } else {
+            chatLineCount = 0
+            activeAgentSessions = []
+        }
+        setMood(.celebrate)
+        celebrateTimer?.invalidate()
+        celebrateTimer = Timer.scheduledTimer(withTimeInterval: Self.celebrateDuration, repeats: false) { _ in
+            Task { @MainActor [weak self] in self?.settleAfterCelebrate() }
+        }
+    }
+
     private func settleAfterCelebrate() {
-        setMood(MoodResolver.aggregate(latestSessions))
+        let resolved = MoodResolver.aggregate(latestSessions)
+        if resolved == .working || resolved == .waiting {
+            buildAgentChatLine(sessions: latestSessions)
+        } else {
+            chatLineCount = 0
+            activeAgentSessions = []
+        }
+        setMood(resolved)
     }
 
     private func setMood(_ newMood: PetMood) {

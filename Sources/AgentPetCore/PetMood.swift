@@ -15,10 +15,10 @@ public enum PetMood: String, Codable, Sendable, CaseIterable {
 /// plays when entering `done` (see the app layer).
 public enum MoodResolver {
     public static func aggregate(_ sessions: [AgentSession]) -> PetMood {
-        // Running work takes priority: the pet reflects what is active now.
+        // Waiting takes priority because user input needs visible attention.
         // `registered` (agent open but idle) is not "working".
-        if sessions.contains(where: { $0.state == .working }) { return .working }
         if sessions.contains(where: { $0.state == .waiting }) { return .waiting }
+        if sessions.contains(where: { $0.state == .working }) { return .working }
         if sessions.contains(where: { $0.state == .done }) { return .done }
         return .idle
     }

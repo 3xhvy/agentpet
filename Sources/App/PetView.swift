@@ -80,6 +80,27 @@ private struct GroupedSession: Identifiable {
 /// Speech bubble listing one row per (agentKind, project) group.
 /// Applies filter/sort/cap from `BubbleSettings` before rendering.
 /// `tailEdge` controls whether the pointer arrow points down (pet) or up (menu bar).
+/// Corner radii scale down as rows stack so tall bubbles stay boxy, not pill-shaped.
+private enum BubbleChrome {
+    static let petRoundRadius: CGFloat = 999
+    static let petStackedRadius: CGFloat = 14
+    static let menuCornerRadius: CGFloat = 10
+
+    static func petRadius(rowCount: Int) -> CGFloat {
+        rowCount > 1 ? petStackedRadius : petRoundRadius
+    }
+}
+
+/// Rounded rect whose radius never exceeds half the width/height — avoids stadium ends.
+private struct ClampedRoundedRect: Shape {
+    var radius: CGFloat
+
+    func path(in rect: CGRect) -> Path {
+        let r = min(radius, rect.width / 2, rect.height / 2)
+        return RoundedRectangle(cornerRadius: r, style: .circular).path(in: rect)
+    }
+}
+
 struct AgentBubble: View {
     let sessions: [AgentSession]
     var tailEdge: Edge = .bottom
@@ -135,47 +156,51 @@ struct AgentBubble: View {
     }
 
     private var isPetChat: Bool { tailEdge == .bottom }
+    private var rowCount: Int { groupedSessions.count }
+    private var cornerRadius: CGFloat {
+        isPetChat ? BubbleChrome.petRadius(rowCount: rowCount) : BubbleChrome.menuCornerRadius
+    }
+    /// Hug width for up to 3 rows; use a stable box width when 4+ rows stack.
+    private var hugHorizontal: Bool { isPetChat && rowCount <= 3 }
 
     var body: some View {
         let fill = isPetChat ? Color.white : bubbleFill
         let stroke = isPetChat ? Color.black.opacity(0.06) : borderColor
+        let bubbleShape = SpeechBubbleShape(
+            radius: cornerRadius,
+            tailWidth: 12,
+            tailHeight: 7,
+            tailEdge: tailEdge
+        )
+        let verticalPad = isPetChat ? 7.0 : 9.0
+        let tailPad: CGFloat = 7
 
-        VStack(spacing: 0) {
-            if tailEdge == .top {
-                Triangle()
-                    .fill(fill)
-                    .frame(width: 12, height: 7)
-                    .scaleEffect(x: 1, y: -1)
-            }
-            VStack(alignment: .leading, spacing: isPetChat ? 4 : 5) {
-                ForEach(groupedSessions) { group in
-                    AgentRow(session: group.session, count: group.count, chatStyle: isPetChat)
-                }
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, isPetChat ? 7 : 9)
-            .background {
-                if isPetChat {
-                    Capsule().fill(fill)
-                } else {
-                    RoundedRectangle(cornerRadius: 14, style: .continuous).fill(fill)
-                }
-            }
-            .overlay {
-                if isPetChat {
-                    Capsule().strokeBorder(stroke, lineWidth: 1)
-                } else {
-                    RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(stroke, lineWidth: 1)
-                }
-            }
-            .shadow(color: .black.opacity(0.18), radius: 5, y: 2)
-            if tailEdge == .bottom {
-                Triangle()
-                    .fill(fill)
-                    .frame(width: 12, height: 7)
+        VStack(alignment: .leading, spacing: isPetChat ? 4 : 5) {
+            ForEach(groupedSessions) { group in
+                AgentRow(
+                    session: group.session,
+                    count: group.count,
+                    chatStyle: isPetChat,
+                    fillWidth: !hugHorizontal
+                )
             }
         }
-        .fixedSize(horizontal: isPetChat, vertical: true)
+        .padding(.horizontal, 12)
+        .padding(.top, verticalPad + (tailEdge == .top ? tailPad : 0))
+        .padding(.bottom, verticalPad + (tailEdge == .bottom ? tailPad : 0))
+        .frame(
+            minWidth: hugHorizontal ? nil : AgentBubble.petContentMaxWidth + 24,
+            alignment: .leading
+        )
+        .background {
+            bubbleShape
+                .fill(fill)
+                .shadow(color: .black.opacity(0.18), radius: 5, y: 2)
+        }
+        .overlay {
+            bubbleShape.stroke(stroke, lineWidth: 1)
+        }
+        .fixedSize(horizontal: hugHorizontal, vertical: true)
         .frame(maxWidth: 420, alignment: .leading)
     }
 
@@ -201,12 +226,13 @@ struct AgentBubble: View {
     }
 }
 
-/// One row per agent session. Iterates `BubbleSettings.effectiveLayout` tokens
-/// in order on a single line; project/title shrink before the message does.
+/// One row per agent session. Icon and project stay fully visible; only the
+/// activity message truncates when space is tight.
 private struct AgentRow: View {
     let session: AgentSession
     var count: Int = 1
     var chatStyle: Bool = false
+    var fillWidth: Bool = false
     @ObservedObject private var settings = BubbleSettings.shared
 
     private var primaryPt: CGFloat { chatStyle ? 12 : settings.fontSize.primaryPt }
@@ -239,11 +265,14 @@ private struct AgentRow: View {
                             Capsule()
                                 .fill(textColor(0.08))
                         )
+                        .fixedSize(horizontal: true, vertical: false)
                 }
             }
+            .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
             .modifier(WaitingTextFlash(active: isWaiting))
         }
-        .frame(maxWidth: rowMaxWidth, alignment: .leading)
+        .frame(maxWidth: fillWidth ? .infinity : rowMaxWidth, alignment: .leading)
+        .help(hoverText)
     }
 
     @ViewBuilder
@@ -251,11 +280,15 @@ private struct AgentRow: View {
         switch token {
         case .dot:
             StateDot(color: stateDotColor, style: dotStyle)
+                .fixedSize(horizontal: true, vertical: false)
+                .layoutPriority(1)
         case .icon:
             ResolvedIconView(
                 choice: settings.iconChoice(for: session.agentKind),
                 size: iconPt
             )
+            .fixedSize(horizontal: true, vertical: false)
+            .layoutPriority(1)
         case .title:
             if let title = session.title {
                 Text(title)
@@ -263,27 +296,29 @@ private struct AgentRow: View {
                     .foregroundStyle(textColor(0.85))
                     .lineLimit(1)
                     .truncationMode(.tail)
-                    .layoutPriority(-1)
+                    .layoutPriority(0)
             }
         case .project:
             Text(projectName)
                 .font(.system(size: primaryPt, weight: .medium))
                 .foregroundStyle(textColor(0.82))
                 .lineLimit(1)
-                .truncationMode(.tail)
-                .layoutPriority(-1)
+                .fixedSize(horizontal: true, vertical: false)
+                .layoutPriority(1)
         case .separator:
             Text(settings.separatorChar)
                 .font(.system(size: primaryPt, weight: .regular))
                 .foregroundStyle(textColor(0.35))
+                .fixedSize(horizontal: true, vertical: false)
+                .layoutPriority(1)
         case .message:
             Text(messageText)
                 .font(.system(size: primaryPt, weight: .medium))
                 .foregroundStyle(textColor(0.82))
                 .lineLimit(1)
                 .truncationMode(.tail)
-                .layoutPriority(1)
-                .fixedSize(horizontal: false, vertical: true)
+                .layoutPriority(-1)
+                .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
         case .stateLabel:
             Text(session.state.rawValue.capitalized)
                 .font(.system(size: secondaryPt, weight: .regular))
@@ -319,6 +354,11 @@ private struct AgentRow: View {
         return m.isEmpty ? session.state.rawValue.capitalized : m
     }
 
+    private var hoverText: String {
+        let suffix = count > 1 ? " x\(count)" : ""
+        return TickerFormatter.line(for: session) + suffix
+    }
+
     private var stateDotColor: Color {
         switch session.state {
         case .waiting:           return .orange
@@ -351,23 +391,122 @@ private struct ChatBubble: View {
     let text: String
 
     var body: some View {
-        VStack(spacing: 0) {
-            Text(text)
-                .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(.black.opacity(0.85))
-                .lineLimit(2)
-                .truncationMode(.tail)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 7)
-                .background(Capsule().fill(.white))
-                .overlay(Capsule().strokeBorder(.black.opacity(0.06), lineWidth: 1))
-                .shadow(color: .black.opacity(0.18), radius: 5, y: 2)
-            Triangle()
+        Text(text)
+            .font(.system(size: 12, weight: .medium))
+            .foregroundStyle(.black.opacity(0.85))
+            .lineLimit(2)
+            .truncationMode(.tail)
+            .padding(.horizontal, 12)
+            .padding(.top, 7)
+            .padding(.bottom, 14)
+            .background {
+                SpeechBubbleShape(
+                    radius: BubbleChrome.petRoundRadius,
+                    tailWidth: 12,
+                    tailHeight: 7,
+                    tailEdge: .bottom
+                )
                 .fill(.white)
-                .frame(width: 12, height: 7)
-        }
+                .shadow(color: .black.opacity(0.18), radius: 5, y: 2)
+            }
+            .overlay {
+                SpeechBubbleShape(
+                    radius: BubbleChrome.petRoundRadius,
+                    tailWidth: 12,
+                    tailHeight: 7,
+                    tailEdge: .bottom
+                )
+                .stroke(Color.black.opacity(0.06), lineWidth: 1)
+            }
         .fixedSize(horizontal: true, vertical: true)
         .frame(maxWidth: 420)
+    }
+}
+
+private struct SpeechBubbleShape: Shape {
+    var radius: CGFloat
+    var tailWidth: CGFloat
+    var tailHeight: CGFloat
+    var tailEdge: Edge = .bottom
+
+    func path(in rect: CGRect) -> Path {
+        switch tailEdge {
+        case .top:    return topTailPath(in: rect)
+        case .bottom: return bottomTailPath(in: rect)
+        default:      return ClampedRoundedRect(radius: radius).path(in: rect)
+        }
+    }
+
+    private func bottomTailPath(in rect: CGRect) -> Path {
+        let body = rect.divided(atDistance: rect.height - tailHeight, from: .minYEdge).slice
+        return roundedBodyWithTail(
+            body: body,
+            tip: CGPoint(x: body.midX, y: rect.maxY),
+            tailLeft: body.midX - tailWidth / 2,
+            tailRight: body.midX + tailWidth / 2,
+            tailY: body.maxY
+        )
+    }
+
+    private func topTailPath(in rect: CGRect) -> Path {
+        let body = rect.divided(atDistance: tailHeight, from: .minYEdge).remainder
+        return roundedBodyWithTail(
+            body: body,
+            tip: CGPoint(x: body.midX, y: rect.minY),
+            tailLeft: body.midX - tailWidth / 2,
+            tailRight: body.midX + tailWidth / 2,
+            tailY: body.minY
+        )
+    }
+
+    private func roundedBodyWithTail(
+        body: CGRect,
+        tip: CGPoint,
+        tailLeft: CGFloat,
+        tailRight: CGFloat,
+        tailY: CGFloat
+    ) -> Path {
+        let r = min(radius, body.width / 2, body.height / 2)
+        var p = Path()
+
+        if tailEdge == .bottom {
+            p.move(to: CGPoint(x: body.minX + r, y: body.minY))
+            p.addLine(to: CGPoint(x: body.maxX - r, y: body.minY))
+            p.addArc(center: CGPoint(x: body.maxX - r, y: body.minY + r),
+                     radius: r, startAngle: .degrees(-90), endAngle: .degrees(0), clockwise: false)
+            p.addLine(to: CGPoint(x: body.maxX, y: body.maxY - r))
+            p.addArc(center: CGPoint(x: body.maxX - r, y: body.maxY - r),
+                     radius: r, startAngle: .degrees(0), endAngle: .degrees(90), clockwise: false)
+            p.addLine(to: CGPoint(x: tailRight, y: tailY))
+            p.addLine(to: tip)
+            p.addLine(to: CGPoint(x: tailLeft, y: tailY))
+            p.addLine(to: CGPoint(x: body.minX + r, y: body.maxY))
+            p.addArc(center: CGPoint(x: body.minX + r, y: body.maxY - r),
+                     radius: r, startAngle: .degrees(90), endAngle: .degrees(180), clockwise: false)
+            p.addLine(to: CGPoint(x: body.minX, y: body.minY + r))
+            p.addArc(center: CGPoint(x: body.minX + r, y: body.minY + r),
+                     radius: r, startAngle: .degrees(180), endAngle: .degrees(270), clockwise: false)
+        } else {
+            p.move(to: tip)
+            p.addLine(to: CGPoint(x: tailRight, y: tailY))
+            p.addLine(to: CGPoint(x: body.maxX - r, y: body.minY))
+            p.addArc(center: CGPoint(x: body.maxX - r, y: body.minY + r),
+                     radius: r, startAngle: .degrees(-90), endAngle: .degrees(0), clockwise: false)
+            p.addLine(to: CGPoint(x: body.maxX, y: body.maxY - r))
+            p.addArc(center: CGPoint(x: body.maxX - r, y: body.maxY - r),
+                     radius: r, startAngle: .degrees(0), endAngle: .degrees(90), clockwise: false)
+            p.addLine(to: CGPoint(x: body.minX + r, y: body.maxY))
+            p.addArc(center: CGPoint(x: body.minX + r, y: body.maxY - r),
+                     radius: r, startAngle: .degrees(90), endAngle: .degrees(180), clockwise: false)
+            p.addLine(to: CGPoint(x: body.minX, y: body.minY + r))
+            p.addArc(center: CGPoint(x: body.minX + r, y: body.minY + r),
+                     radius: r, startAngle: .degrees(180), endAngle: .degrees(270), clockwise: false)
+            p.addLine(to: CGPoint(x: tailLeft, y: tailY))
+            p.addLine(to: tip)
+        }
+
+        p.closeSubpath()
+        return p
     }
 }
 
@@ -440,13 +579,3 @@ private struct WaitingTextFlash: ViewModifier {
     }
 }
 
-private struct Triangle: Shape {
-    func path(in rect: CGRect) -> Path {
-        var p = Path()
-        p.move(to: CGPoint(x: rect.minX, y: rect.minY))
-        p.addLine(to: CGPoint(x: rect.maxX, y: rect.minY))
-        p.addLine(to: CGPoint(x: rect.midX, y: rect.maxY))
-        p.closeSubpath()
-        return p
-    }
-}

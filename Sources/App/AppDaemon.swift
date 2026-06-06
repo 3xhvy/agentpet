@@ -29,6 +29,7 @@ final class AppDaemon: ObservableObject {
         }
         store.prune(now: Date())
         refresh()
+        QuotaController.shared.start()
 
         try? server.start { event in
             Task { @MainActor [weak self] in self?.ingest(event) }
