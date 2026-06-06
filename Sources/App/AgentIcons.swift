@@ -33,8 +33,9 @@ enum AgentIcons {
         case .cursor:    return cursorSVG
         case .codex:     return openaiSVG
         case .gemini:    return geminiSVG
-        case .windsurf:  return windsurfSVG
-        case .opencode:  return opencodeSVG
+        case .windsurf:    return windsurfSVG
+        case .opencode:    return opencodeSVG
+        case .antigravity: return geminiSVG
         case .cli, .unknown: return nil
         }
     }

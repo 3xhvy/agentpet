@@ -12,8 +12,9 @@ public enum TickerFormatter {
         case .codex:     return "Codex"
         case .gemini:    return "Gemini"
         case .opencode:  return "Opencode"
-        case .windsurf:  return "Windsurf"
-        case .cli:       return "Agent"
+        case .windsurf:    return "Windsurf"
+        case .antigravity: return "Antigravity"
+        case .cli:         return "Agent"
         case .unknown:   return "Agent"
         }
     }

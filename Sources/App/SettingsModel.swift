@@ -78,7 +78,7 @@ final class SettingsModel: ObservableObject {
         let expectedCommand = "\"\(currentPath)\" hook"
         for agent in agents where agent.isSupported {
             guard let spec = AgentHooks.spec(for: agent.kind) else { continue }
-            let settings = HookInstaller.readSettings(path: spec.settingsPath)
+            let settings = (try? HookInstaller.readSettings(path: spec.settingsPath)) ?? [:]
             guard HookInstaller.isInstalledOnDisk(path: spec.settingsPath,
                                                   events: spec.events,
                                                   style: spec.style) else { continue }
