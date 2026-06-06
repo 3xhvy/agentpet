@@ -16,6 +16,7 @@ public enum TranscriptReader {
     // Provisional titles (first user message) are not cached: a later summary
     // event should supersede them on the next call.
     nonisolated(unsafe) private static var summaryCache: [String: String] = [:]
+    nonisolated(unsafe) private static var recapCache: [String: String] = [:]
 
     /// Returns the title for the transcript at `path`, or `nil` if unreadable.
     public static func title(at path: String) -> String? {
@@ -25,9 +26,19 @@ public enum TranscriptReader {
         return result
     }
 
+    /// Returns the latest Claude assistant recap from the transcript, collapsed
+    /// to one display line, or `nil` when the transcript has no recap marker.
+    public static func latestAssistantRecap(at path: String) -> String? {
+        if let hit = recapCache[path] { return hit }
+        guard let result = readLatestAssistantRecap(path) else { return nil }
+        recapCache[path] = result
+        return result
+    }
+
     /// Clears cached titles — useful after fixing the extraction logic at runtime.
     public static func clearCache() {
         summaryCache.removeAll()
+        recapCache.removeAll()
     }
 
     /// Constructs the expected transcript path for a Claude Code session.
@@ -86,6 +97,31 @@ public enum TranscriptReader {
         return firstUserText.map { ($0, false) }
     }
 
+    private static func readLatestAssistantRecap(_ path: String) -> String? {
+        guard let handle = FileHandle(forReadingAtPath: path) else { return nil }
+        defer { try? handle.close() }
+
+        let fileSize = (try? handle.seekToEnd()) ?? 0
+        let maxBytes: UInt64 = 131_072
+        try? handle.seek(toOffset: fileSize > maxBytes ? fileSize - maxBytes : 0)
+        let raw = handle.readDataToEndOfFile()
+        guard let text = String(data: raw, encoding: .utf8) else { return nil }
+
+        for line in text.components(separatedBy: "\n").reversed() {
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            guard !trimmed.isEmpty,
+                  let lineData = trimmed.data(using: .utf8),
+                  let json = try? JSONSerialization.jsonObject(with: lineData) as? [String: Any],
+                  json["type"] as? String == "assistant",
+                  let assistantText = extractAssistantText(from: json),
+                  let recap = cleanRecap(assistantText)
+            else { continue }
+            return recap
+        }
+
+        return nil
+    }
+
     private static func extractUserText(from json: [String: Any]) -> String? {
         guard let message = json["message"] as? [String: Any] else { return nil }
 
@@ -106,6 +142,46 @@ public enum TranscriptReader {
         }
 
         return nil
+    }
+
+    private static func extractAssistantText(from json: [String: Any]) -> String? {
+        guard let message = json["message"] as? [String: Any] else { return nil }
+
+        if let blocks = message["content"] as? [[String: Any]] {
+            let text = blocks.compactMap { block -> String? in
+                guard block["type"] as? String == "text" else { return nil }
+                return block["text"] as? String
+            }.joined(separator: "\n")
+            return text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : text
+        }
+
+        if let raw = message["content"] as? String {
+            return raw
+        }
+
+        return nil
+    }
+
+    private static func cleanRecap(_ text: String) -> String? {
+        let collapsed = text
+            .replacingOccurrences(of: "\r", with: "\n")
+            .components(separatedBy: .whitespacesAndNewlines)
+            .filter { !$0.isEmpty }
+            .joined(separator: " ")
+
+        let markers = [
+            #"(?i)(?:^|\s)(?:[※*#\-\s]*)recap\s*:\s*"#,
+            #"(?i)(?:^|\s)(?:all\s+changes\s+done|done)\.?\s+summary(?:\s+of\s+all\s+changes)?\s*:\s*"#,
+            #"(?i)(?:^|\s)summary\s+of\s+all\s+changes\s*:\s*"#
+        ]
+
+        guard let range = markers.compactMap({
+            collapsed.range(of: $0, options: .regularExpression)
+        }).first else { return nil }
+
+        let recap = collapsed[range.upperBound...]
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return recap.isEmpty ? nil : String(recap)
     }
 
     /// Returns `text` trimmed and capped at 60 chars, or `nil` if it looks like
