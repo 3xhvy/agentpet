@@ -15,10 +15,10 @@ final class BubbleSettingsTests: XCTestCase {
         super.tearDown()
     }
 
-    func testMultiAgentBubbleDefaultsOff() {
+    func testMultiAgentBubbleDefaultsOn() {
         let settings = BubbleSettings()
 
-        XCTAssertFalse(settings.multiAgentBubbleEnabled)
+        XCTAssertTrue(settings.multiAgentBubbleEnabled)
     }
 
     func testMultiAgentBubblePersists() {

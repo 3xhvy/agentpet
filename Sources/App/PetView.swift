@@ -136,6 +136,8 @@ struct AgentBubble: View {
     }
 
     private var isPetChat: Bool { tailEdge == .bottom }
+    // Use capsule only for a single-agent pet-chat bubble; switch to rounded rect for 2+ agents.
+    private var useCapsule: Bool { isPetChat && groupedSessions.count <= 1 }
 
     var body: some View {
         let fill = isPetChat ? Color.white : bubbleFill
@@ -156,14 +158,14 @@ struct AgentBubble: View {
             .padding(.horizontal, 12)
             .padding(.vertical, isPetChat ? 7 : 9)
             .background {
-                if isPetChat {
+                if useCapsule {
                     Capsule().fill(fill)
                 } else {
                     RoundedRectangle(cornerRadius: 14, style: .continuous).fill(fill)
                 }
             }
             .overlay {
-                if isPetChat {
+                if useCapsule {
                     Capsule().strokeBorder(stroke, lineWidth: 1)
                 } else {
                     RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(stroke, lineWidth: 1)
@@ -245,6 +247,7 @@ private struct AgentRow: View {
             .modifier(WaitingTextFlash(active: isWaiting))
         }
         .frame(maxWidth: rowMaxWidth, alignment: .leading)
+        .animation(.spring(response: 0.3, dampingFraction: 0.75), value: session.message)
     }
 
     @ViewBuilder
@@ -285,6 +288,8 @@ private struct AgentRow: View {
                 .truncationMode(.tail)
                 .layoutPriority(1)
                 .fixedSize(horizontal: false, vertical: true)
+                .contentTransition(.opacity)
+                .id(messageText)
         case .stateLabel:
             Text(session.state.rawValue.capitalized)
                 .font(.system(size: secondaryPt, weight: .regular))
@@ -317,7 +322,9 @@ private struct AgentRow: View {
 
     private var messageText: String {
         let m = session.message?.trimmingCharacters(in: .whitespaces) ?? ""
-        return m.isEmpty ? session.state.rawValue.capitalized : m
+        if !m.isEmpty { return m }
+        return ClaudeActivityFormatter.stateMessage(for: session.state)
+            ?? session.state.rawValue.capitalized
     }
 
     private var stateDotColor: Color {
