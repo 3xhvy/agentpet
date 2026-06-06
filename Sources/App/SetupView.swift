@@ -9,7 +9,7 @@ struct SetupView: View {
     @ObservedObject private var imagePets = ImagePetStore.shared
     var onClose: () -> Void
 
-    enum Tab { case general, pet, about }
+    enum Tab { case general, pet, bubble, about }
     @State private var tab: Tab = .general
 
     private var selectedPack: ImagePetPack? {
@@ -26,6 +26,8 @@ struct SetupView: View {
                     GeneralTab(model: model, pet: pet)
                 case .pet:
                     PetTab(pet: pet, imagePets: imagePets, model: model, selectedPack: selectedPack)
+                case .bubble:
+                    BubbleSettingsView()
                 case .about:
                     AboutTab()
                 }
@@ -41,6 +43,7 @@ struct SetupView: View {
         HStack(spacing: 8) {
             TabButton(icon: "gearshape.fill", label: "General", selected: tab == .general) { tab = .general }
             TabButton(icon: "pawprint.fill", label: "Pet", selected: tab == .pet) { tab = .pet }
+            TabButton(icon: "bubble.left.and.bubble.right.fill", label: "Bubble", selected: tab == .bubble) { tab = .bubble }
             TabButton(icon: "heart.fill", label: "About", selected: tab == .about) { tab = .about }
         }
         .frame(maxWidth: .infinity)
