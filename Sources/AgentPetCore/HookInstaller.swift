@@ -1,5 +1,19 @@
 import Foundation
 
+/// Thrown when an agent's settings file exists but cannot be parsed as a JSON
+/// object. Rewriting it anyway would replace whatever the user had with just
+/// AgentPet's hooks, so install/uninstall refuse instead.
+public enum HookInstallerError: LocalizedError, Equatable {
+    case unreadableSettings(path: String)
+
+    public var errorDescription: String? {
+        switch self {
+        case .unreadableSettings(let path):
+            return "\(path) is not valid JSON; fix or remove it and try again."
+        }
+    }
+}
+
 /// Installs/removes AgentPet's hook entries in an agent's config. Claude Code,
 /// Codex, and Gemini share the nested `{"hooks": {...}}` shape; Cursor and
 /// Windsurf use flatter JSON shapes; opencode uses a JS plugin file. The shape
@@ -190,10 +204,14 @@ public enum HookInstaller {
 
     // MARK: - Disk IO
 
-    public static func readSettings(path: String) -> [String: Any] {
-        guard let data = FileManager.default.contents(atPath: path),
-              let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
-        else { return [:] }
+    /// Reads an agent's settings file. A missing or empty file is an empty
+    /// config; a file with content that does not parse as a JSON object throws,
+    /// so callers never rewrite (and thereby wipe) settings they could not read.
+    public static func readSettings(path: String) throws -> [String: Any] {
+        guard let data = FileManager.default.contents(atPath: path), !data.isEmpty else { return [:] }
+        guard let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            throw HookInstallerError.unreadableSettings(path: path)
+        }
         return obj
     }
 
@@ -241,11 +259,11 @@ public enum HookInstaller {
                                          events: [String] = events, style: HookStyle = .claudeNested) -> Bool {
         switch style {
         case .claudeNested:
-            return isInstalled(in: readSettings(path: path), events: events)
+            return isInstalled(in: (try? readSettings(path: path)) ?? [:], events: events)
         case .cursorFlat, .windsurfFlat:
-            return isInstalledFlat(in: readSettings(path: path), events: events)
+            return isInstalledFlat(in: (try? readSettings(path: path)) ?? [:], events: events)
         case .antigravityNested:
-            return isInstalledAntigravity(in: readSettings(path: path), events: events)
+            return isInstalledAntigravity(in: (try? readSettings(path: path)) ?? [:], events: events)
         case .opencodePlugin:
             guard let s = try? String(contentsOfFile: path, encoding: .utf8) else { return false }
             return isOurs(s)
