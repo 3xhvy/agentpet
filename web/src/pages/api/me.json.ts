@@ -4,7 +4,10 @@ import { verifySession, SESSION_COOKIE } from "../../lib/auth";
 
 export const prerender = false;
 
-const v = (n: string): string => (env as any)?.[n] ?? (import.meta as any).env?.[n] ?? "";
+const v = (n: string): string => {
+  try { const e = (env as any)?.[n]; if (e) return String(e); } catch {}
+  return (import.meta as any).env?.[n] ?? "";
+};
 
 // Current signed-in user (or null). The nav fetches this client-side so it works
 // on the statically prerendered pages too.

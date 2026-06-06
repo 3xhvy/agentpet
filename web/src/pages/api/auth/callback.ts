@@ -4,7 +4,10 @@ import { signSession, SESSION_COOKIE, type SessionUser } from "../../../lib/auth
 
 export const prerender = false;
 
-const v = (n: string): string => (env as any)?.[n] ?? (import.meta as any).env?.[n] ?? "";
+const v = (n: string): string => {
+  try { const e = (env as any)?.[n]; if (e) return String(e); } catch {}
+  return (import.meta as any).env?.[n] ?? "";
+};
 const THIRTY_DAYS = 30 * 24 * 60 * 60;
 
 // GitHub redirects here with ?code&state. Verify state, swap code for a token,
@@ -53,5 +56,6 @@ export const GET: APIRoute = async ({ request, cookies }) => {
 
   const returnTo = cookies.get("ap_oauth_return")?.value || "/";
   cookies.delete("ap_oauth_return", { path: "/" });
-  return Response.redirect(`${origin}${returnTo.startsWith("/") ? returnTo : "/"}`, 302);
+  const dest = `${origin}${returnTo.startsWith("/") ? returnTo : "/"}`;
+  return new Response(null, { status: 302, headers: { Location: dest } });
 };

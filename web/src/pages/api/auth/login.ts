@@ -3,7 +3,10 @@ import { env } from "cloudflare:workers";
 
 export const prerender = false;
 
-const v = (n: string): string => (env as any)?.[n] ?? (import.meta as any).env?.[n] ?? "";
+const v = (n: string): string => {
+  try { const e = (env as any)?.[n]; if (e) return String(e); } catch {}
+  return (import.meta as any).env?.[n] ?? "";
+};
 
 function randomState(): string {
   const a = new Uint8Array(16);
@@ -29,5 +32,5 @@ export const GET: APIRoute = async ({ request, cookies }) => {
   u.searchParams.set("redirect_uri", `${origin}/api/auth/callback`);
   u.searchParams.set("scope", "read:user");
   u.searchParams.set("state", state);
-  return Response.redirect(u.toString(), 302);
+  return new Response(null, { status: 302, headers: { Location: u.toString() } });
 };
