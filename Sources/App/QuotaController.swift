@@ -293,9 +293,12 @@ private enum QuotaCredentialStore {
     private static func cursorSQLiteValue(dbPath: String, key: String) -> String? {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/sqlite3")
+        let safeKey = key
+            .replacingOccurrences(of: "'", with: "''")
+            .replacingOccurrences(of: "\0", with: "")
         process.arguments = [
             dbPath,
-            "SELECT value FROM itemTable WHERE key='\(key.replacingOccurrences(of: "'", with: "''"))' LIMIT 1;",
+            "SELECT value FROM itemTable WHERE key='\(safeKey)' LIMIT 1;",
         ]
         let pipe = Pipe()
         process.standardOutput = pipe

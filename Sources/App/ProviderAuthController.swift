@@ -10,6 +10,7 @@ final class ProviderAuthController: ObservableObject {
     @Published private(set) var savedKinds: Set<AgentKind> = []
     @Published private(set) var localKinds: Set<AgentKind> = []
     @Published private(set) var accountKinds: Set<AgentKind> = []
+    @Published private(set) var envKinds: Set<AgentKind> = []
     @Published private(set) var projectIds: [AgentKind: String] = [:]
 
     private let defaults = UserDefaults.standard
@@ -27,6 +28,9 @@ final class ProviderAuthController: ObservableObject {
         accountKinds = Set(ProviderAuthCatalog.quotaProviders.compactMap { provider in
             ProviderLocalAuth.hasSignedInAccount(provider.kind) ? provider.kind : nil
         })
+        envKinds = Set(ProviderAuthCatalog.quotaProviders.compactMap { provider in
+            envToken(for: provider.kind) != nil ? provider.kind : nil
+        })
         savedKinds = importedKinds().filter { localKinds.contains($0) || accountKinds.contains($0) }
         var projects: [AgentKind: String] = [:]
         for provider in ProviderAuthCatalog.quotaProviders where provider.needsProjectId {
@@ -39,32 +43,19 @@ final class ProviderAuthController: ObservableObject {
     }
 
     func isConnected(_ kind: AgentKind) -> Bool {
-        savedKinds.contains(kind) || localKinds.contains(kind) || accountKinds.contains(kind)
+        savedKinds.contains(kind) || localKinds.contains(kind) || accountKinds.contains(kind) || envKinds.contains(kind)
     }
 
     func connectionSource(for kind: AgentKind) -> String {
         if savedKinds.contains(kind) { return "Imported" }
         if localKinds.contains(kind) { return "CLI auth" }
         if accountKinds.contains(kind) { return "Signed in" }
+        if envKinds.contains(kind) { return "env var" }
         return "Not connected"
     }
 
     func projectId(for kind: AgentKind) -> String {
         projectIds[kind] ?? ""
-    }
-
-    func save(kind: AgentKind, token: String, projectId: String? = nil) {
-        if let projectId {
-            let key = projectPrefix + kind.rawValue
-            let cleanProject = projectId.trimmingCharacters(in: .whitespacesAndNewlines)
-            if cleanProject.isEmpty {
-                defaults.removeObject(forKey: key)
-            } else {
-                defaults.set(cleanProject, forKey: key)
-            }
-        }
-        refresh()
-        QuotaController.shared.refresh()
     }
 
     func importLocal(kind: AgentKind) {
@@ -105,6 +96,21 @@ final class ProviderAuthController: ObservableObject {
         text
             .replacingOccurrences(of: "\\", with: "\\\\")
             .replacingOccurrences(of: "\"", with: "\\\"")
+            .replacingOccurrences(of: "\n", with: "\\n")
+            .replacingOccurrences(of: "\r", with: "\\r")
+    }
+
+    private func envToken(for kind: AgentKind) -> String? {
+        func env(_ key: String) -> String? {
+            let v = ProcessInfo.processInfo.environment[key]?.trimmingCharacters(in: .whitespacesAndNewlines)
+            return v?.isEmpty == false ? v : nil
+        }
+        switch kind {
+        case .claude:  return env("ANTHROPIC_AUTH_TOKEN") ?? env("CLAUDE_CODE_OAUTH_TOKEN")
+        case .codex:   return env("OPENAI_ACCESS_TOKEN")
+        case .gemini:  return env("GEMINI_ACCESS_TOKEN") ?? env("GOOGLE_OAUTH_ACCESS_TOKEN")
+        default:       return nil
+        }
     }
 
     private func importedKinds() -> Set<AgentKind> {
@@ -225,9 +231,12 @@ private enum ProviderLocalAuth {
     private static func sqliteValue(dbPath: String, key: String) -> String? {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/sqlite3")
+        let safeKey = key
+            .replacingOccurrences(of: "'", with: "''")
+            .replacingOccurrences(of: "\0", with: "")
         process.arguments = [
             dbPath,
-            "SELECT value FROM itemTable WHERE key='\(key.replacingOccurrences(of: "'", with: "''"))' LIMIT 1;"
+            "SELECT value FROM itemTable WHERE key='\(safeKey)' LIMIT 1;"
         ]
 
         let pipe = Pipe()
