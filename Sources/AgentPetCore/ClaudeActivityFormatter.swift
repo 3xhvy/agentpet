@@ -11,6 +11,16 @@ public struct ClaudeToolInput: Decodable, Equatable, Sendable {
     public let prompt: String?
     public let subagentType: String?
 
+    public init(
+        filePath: String? = nil, command: String? = nil, description: String? = nil,
+        pattern: String? = nil, query: String? = nil, url: String? = nil,
+        prompt: String? = nil, subagentType: String? = nil
+    ) {
+        self.filePath = filePath; self.command = command; self.description = description
+        self.pattern = pattern; self.query = query; self.url = url
+        self.prompt = prompt; self.subagentType = subagentType
+    }
+
     enum CodingKeys: String, CodingKey {
         case filePath = "file_path"
         case command, description, pattern, query, url, prompt
@@ -35,22 +45,12 @@ public enum ClaudeActivityFormatter {
 
         switch eventName {
         case "UserPromptSubmit":
-            return pick(from: thinking, seed: seed(sessionId, eventName, toolName, toolInput))
+            return pick(from: thinking, key: eventName)
         case "PreToolUse", "PostToolUse":
-            return toolActivity(
-                sessionId: sessionId,
-                eventName: eventName,
-                toolName: toolName,
-                toolInput: toolInput
-            )
+            return toolActivity(toolName: toolName, toolInput: toolInput)
         default:
-            if let toolName {
-                return toolActivity(
-                    sessionId: sessionId,
-                    eventName: eventName,
-                    toolName: toolName,
-                    toolInput: toolInput
-                )
+            if toolName != nil {
+                return toolActivity(toolName: toolName, toolInput: toolInput)
             }
             return trimmed(explicitMessage)
         }
@@ -112,12 +112,11 @@ public enum ClaudeActivityFormatter {
     ]
 
     private static func toolActivity(
-        sessionId: String,
-        eventName: String,
         toolName: String?,
         toolInput: ClaudeToolInput?
     ) -> String? {
         guard let toolName else { return nil }
+        if let hint = extensionHint(toolName: toolName, filePath: toolInput?.filePath) { return hint }
         let phrases: [String]
         switch toolName {
         case "Read":
@@ -135,30 +134,49 @@ public enum ClaudeActivityFormatter {
         default:
             phrases = generic
         }
-        return pick(from: phrases, seed: seed(sessionId, eventName, toolName, toolInput))
+        return pick(from: phrases, key: toolName)
     }
 
-    private static func seed(
-        _ sessionId: String,
-        _ eventName: String,
-        _ toolName: String?,
-        _ toolInput: ClaudeToolInput?
-    ) -> String {
-        [
-            sessionId,
-            eventName,
-            toolName ?? "",
-            toolInput?.filePath ?? "",
-            toolInput?.command ?? "",
-            toolInput?.pattern ?? "",
-            toolInput?.query ?? "",
-        ].joined(separator: "|")
+    private static func extensionHint(toolName: String, filePath: String?) -> String? {
+        guard let path = filePath else { return nil }
+        let lower = path.lowercased()
+        let isTest = lower.contains("tests/") || lower.hasSuffix("tests.swift") || lower.hasSuffix("test.swift")
+        let isDoc  = lower.hasSuffix(".md") || lower.hasSuffix(".txt") || lower.hasSuffix(".rst")
+        let isCfg  = lower.hasSuffix(".json") || lower.hasSuffix(".yaml") || lower.hasSuffix(".yml")
+                  || lower.hasSuffix(".plist") || lower.hasSuffix(".toml")
+        let isRead  = toolName == "Read"
+        let isWrite = toolName == "Edit" || toolName == "Write" || toolName == "MultiEdit"
+        if isTest  && isRead  { return "Reviewing tests…" }
+        if isTest  && isWrite { return "Refining tests…" }
+        if isDoc   && isRead  { return "Reading the docs…" }
+        if isDoc   && isWrite { return "Updating the docs…" }
+        if isCfg   && isRead  { return "Parsing config…" }
+        if isCfg   && isWrite { return "Adjusting config…" }
+        return nil
     }
 
-    private static func pick(from phrases: [String], seed: String) -> String {
+    private static let doneMessages = [
+        "All done!", "Wrapped up!", "Delivered!", "Finished!", "Mission complete!",
+    ]
+    private static let waitingMessages = [
+        "Awaiting instructions…", "Standing by…", "Listening…",
+    ]
+
+    public static func stateMessage(for state: AgentState) -> String? {
+        switch state {
+        case .done:    return pick(from: doneMessages,    key: "state.done")
+        case .waiting: return pick(from: waitingMessages, key: "state.waiting")
+        default:       return nil
+        }
+    }
+
+    nonisolated(unsafe) private static var callCounts: [String: Int] = [:]
+
+    private static func pick(from phrases: [String], key: String) -> String {
         guard !phrases.isEmpty else { return "Working…" }
-        let hash = seed.utf8.reduce(5381) { ($0 << 5) &+ $0 &+ Int($1) }
-        return phrases[abs(hash) % phrases.count]
+        let n = (callCounts[key, default: 0] + 1) % phrases.count
+        callCounts[key] = n
+        return phrases[n]
     }
 
     private static func trimmed(_ text: String?) -> String? {
