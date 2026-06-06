@@ -9,6 +9,7 @@ struct MenuContentView: View {
     @ObservedObject private var petWindow = PetWindowController.shared
     @ObservedObject private var statusBar = StatusBarController.shared
     @ObservedObject private var pet = PetController.shared
+    @ObservedObject private var quota = QuotaController.shared
     var dismiss: () -> Void
 
     /// Show agents that are doing something or just finished. Idle and merely
@@ -23,6 +24,8 @@ struct MenuContentView: View {
             header
             divider
             agentSection
+            divider
+            quotaSection
             divider
             controls
             divider
@@ -94,6 +97,29 @@ struct MenuContentView: View {
             .font(.system(size: 10, weight: .semibold)).tracking(1.4)
             .foregroundStyle(.white.opacity(0.35))
             .padding(.horizontal, 14).padding(.top, 12).padding(.bottom, 6)
+    }
+
+    // MARK: Quota
+
+    private var quotaSection: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack {
+                sectionLabel("Quota")
+                Spacer()
+                Button(action: { quota.refresh() }) {
+                    Image(systemName: quota.isRefreshing ? "arrow.triangle.2.circlepath" : "arrow.clockwise")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(.white.opacity(0.45))
+                }
+                .buttonStyle(.plain)
+                .disabled(quota.isRefreshing)
+                .padding(.trailing, 14).padding(.top, 12).padding(.bottom, 6)
+            }
+            ForEach(quota.snapshots) { snapshot in
+                QuotaProviderRow(snapshot: snapshot)
+            }
+            .padding(.bottom, 8)
+        }
     }
 
     // MARK: Controls
@@ -261,5 +287,80 @@ private struct AgentRow: View {
             let s = max(0, Int(now.timeIntervalSince(session.stateSince)))
             return s < 60 ? "\(s)s" : "\(s / 60)m \(s % 60)s"
         }
+    }
+}
+
+private struct QuotaProviderRow: View {
+    let snapshot: QuotaSnapshot
+
+    private var primaryBucket: QuotaBucket? {
+        snapshot.buckets.min { lhs, rhs in
+            lhs.remainingPercentage < rhs.remainingPercentage
+        }
+    }
+
+    var body: some View {
+        HStack(spacing: 8) {
+            AgentIconView(kind: snapshot.provider, size: 14)
+                .frame(width: 16, height: 16)
+
+            Text(snapshot.displayName)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(.white.opacity(0.75))
+                .frame(width: 52, alignment: .leading)
+                .lineLimit(1)
+
+            GeometryReader { proxy in
+                ZStack(alignment: .leading) {
+                    Capsule().fill(barColor.opacity(0.18))
+                    Capsule()
+                        .fill(barColor)
+                        .frame(width: max(4, proxy.size.width * progress))
+                }
+            }
+            .frame(height: 6)
+
+            Text(trailingLabel)
+                .font(.system(size: 10, weight: .semibold, design: .rounded))
+                .foregroundStyle(labelColor)
+                .frame(width: 36, alignment: .trailing)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 5)
+        .help(helpText)
+    }
+
+    private var progress: CGFloat {
+        guard let bucket = primaryBucket else { return 0 }
+        return CGFloat(min(max(bucket.remainingPercentage / 100, 0), 1))
+    }
+
+    private var trailingLabel: String {
+        guard let bucket = primaryBucket else { return "N/A" }
+        return "\(Int(bucket.remainingPercentage.rounded()))%"
+    }
+
+    private var labelColor: Color {
+        primaryBucket == nil ? .white.opacity(0.35) : barColor
+    }
+
+    private var barColor: Color {
+        guard let bucket = primaryBucket else { return .white.opacity(0.22) }
+        if bucket.remainingPercentage > 70 { return .green }
+        if bucket.remainingPercentage >= 30 { return .yellow }
+        return .red
+    }
+
+    private var helpText: String {
+        if let bucket = primaryBucket {
+            var parts = ["\(snapshot.displayName): \(bucket.name)"]
+            if let plan = snapshot.plan { parts.append(plan) }
+            parts.append("\(Int(bucket.remainingPercentage.rounded()))% remaining")
+            if let resetAt = bucket.resetAt {
+                parts.append("resets \(resetAt.formatted(date: .abbreviated, time: .shortened))")
+            }
+            return parts.joined(separator: " · ")
+        }
+        return "\(snapshot.displayName): \(snapshot.message ?? "quota unavailable")"
     }
 }

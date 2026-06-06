@@ -9,7 +9,7 @@ struct SetupView: View {
     @ObservedObject private var imagePets = ImagePetStore.shared
     var onClose: () -> Void
 
-    enum Tab { case general, pet, bubble, about }
+    enum Tab { case general, quota, pet, bubble, about }
     @State private var tab: Tab = .general
 
     private var selectedPack: ImagePetPack? {
@@ -24,6 +24,8 @@ struct SetupView: View {
                 switch tab {
                 case .general:
                     GeneralTab(model: model, pet: pet)
+                case .quota:
+                    QuotaTab()
                 case .pet:
                     PetTab(pet: pet, imagePets: imagePets, model: model, selectedPack: selectedPack)
                 case .bubble:
@@ -42,6 +44,7 @@ struct SetupView: View {
     private var tabBar: some View {
         HStack(spacing: 8) {
             TabButton(icon: "gearshape.fill", label: "General", selected: tab == .general) { tab = .general }
+            TabButton(icon: "chart.bar.xaxis", label: "Quota", selected: tab == .quota) { tab = .quota }
             TabButton(icon: "pawprint.fill", label: "Pet", selected: tab == .pet) { tab = .pet }
             TabButton(icon: "bubble.left.and.bubble.right.fill", label: "Bubble", selected: tab == .bubble) { tab = .bubble }
             TabButton(icon: "heart.fill", label: "About", selected: tab == .about) { tab = .about }
@@ -348,6 +351,140 @@ private struct GeneralTab: View {
         case .unavailable:
             EmptyView()
         }
+    }
+}
+
+// MARK: - Quota
+
+private struct QuotaTab: View {
+    @ObservedObject private var auth = ProviderAuthController.shared
+    @ObservedObject private var quota = QuotaController.shared
+
+    var body: some View {
+        Form {
+            Section {
+                ForEach(ProviderAuthCatalog.quotaProviders) { provider in
+                    ProviderAuthRow(provider: provider, auth: auth)
+                }
+            } header: {
+                Text("Provider auth")
+            } footer: {
+                Text("Use the provider's own CLI/OAuth login, then import or let AgentPet detect the local auth file. No manual API token paste required.")
+            }
+
+            Section("Quota warnings") {
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Warn when quota is low")
+                        Text("The pet shows a warning when any provider quota drops below this remaining percentage.")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    ColorSwitch(isOn: $quota.warningEnabled)
+                }
+                HStack {
+                    Slider(value: $quota.warningThreshold, in: 5...50, step: 5)
+                    Text("\(Int(quota.warningThreshold))%")
+                        .monospacedDigit()
+                        .foregroundStyle(.secondary)
+                        .frame(width: 44, alignment: .trailing)
+                }
+                .disabled(!quota.warningEnabled)
+                .opacity(quota.warningEnabled ? 1 : 0.5)
+            }
+        }
+        .formStyle(.grouped)
+    }
+}
+
+private struct ProviderAuthRow: View {
+    let provider: ProviderAuthInfo
+    @ObservedObject var auth: ProviderAuthController
+
+    private var connected: Bool { auth.isConnected(provider.kind) }
+    private var localAvailable: Bool { auth.localKinds.contains(provider.kind) }
+    private var imported: Bool { auth.savedKinds.contains(provider.kind) }
+    private var savedProjectId: String { auth.projectId(for: provider.kind) }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .center, spacing: 10) {
+                AgentIconView(kind: provider.kind, size: 18)
+                    .frame(width: 22)
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack(spacing: 6) {
+                        Text(provider.displayName)
+                        Text(statusText)
+                            .font(.caption2.weight(.semibold))
+                            .foregroundStyle(statusColor)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Capsule().fill(statusColor.opacity(0.14)))
+                    }
+                    Text(provider.note)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    if auth.accountKinds.contains(provider.kind),
+                       !localAvailable,
+                       !imported,
+                       provider.supportsQuota {
+                        Text("Signed in, but no local quota token was found to import.")
+                            .font(.caption2)
+                            .foregroundStyle(.orange)
+                    }
+                    if provider.needsProjectId, !savedProjectId.isEmpty {
+                        Text("Project: \(savedProjectId)")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
+                }
+                Spacer()
+            }
+
+            HStack {
+                if let command = provider.loginCommand {
+                    Text(command)
+                        .font(.caption.monospaced())
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 3)
+                        .background(RoundedRectangle(cornerRadius: 5).fill(.secondary.opacity(0.12)))
+                }
+                Spacer()
+                Button("Open login") {
+                    auth.openLogin(for: provider)
+                }
+                .controlSize(.small)
+                .disabled(provider.loginCommand == nil)
+
+                Button(imported ? "Re-import" : "Import") {
+                    auth.importLocal(kind: provider.kind)
+                }
+                .controlSize(.small)
+                .buttonStyle(.borderedProminent)
+                .disabled(!localAvailable)
+
+                Button("Clear") {
+                    auth.clear(kind: provider.kind)
+                }
+                .controlSize(.small)
+                .disabled(!imported && savedProjectId.isEmpty)
+            }
+        }
+        .padding(.vertical, 4)
+        .onAppear { auth.refresh() }
+    }
+
+    private var statusText: String {
+        if connected { return auth.connectionSource(for: provider.kind) }
+        return provider.supportsQuota ? "Login needed" : "Optional"
+    }
+
+    private var statusColor: Color {
+        if imported || localAvailable { return .green }
+        if connected { return .orange }
+        return provider.supportsQuota ? .orange : .secondary
     }
 }
 
