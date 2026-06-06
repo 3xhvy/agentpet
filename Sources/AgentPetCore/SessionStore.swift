@@ -59,13 +59,22 @@ public final class SessionStore {
         let transcriptPath: String? = event.transcriptPath
             ?? event.project.map { TranscriptReader.inferredPath(sessionId: event.sessionId, cwd: $0) }
         let resolvedTitle: String? = transcriptPath.flatMap { TranscriptReader.title(at: $0) }
+        let resolvedMessage: String? = {
+            if event.agentKind == .claude,
+               state == .done,
+               let transcriptPath,
+               let recap = TranscriptReader.latestAssistantRecap(at: transcriptPath) {
+                return recap
+            }
+            return event.message
+        }()
 
         if var existing = byID[event.sessionId] {
             if existing.state != state { existing.stateSince = now }
             existing.state = state
             existing.updatedAt = now
             if let project = event.project { existing.project = project }
-            existing.message = event.message
+            existing.message = resolvedMessage
             if let t = resolvedTitle { existing.title = t }
             byID[event.sessionId] = existing
             return existing
@@ -76,7 +85,7 @@ public final class SessionStore {
             project: event.project,
             title: resolvedTitle,
             state: state,
-            message: event.message,
+            message: resolvedMessage,
             source: .hook,
             updatedAt: now
         )
