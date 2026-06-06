@@ -6,20 +6,94 @@ import UniformTypeIdentifiers
 
 struct BubbleSettingsView: View {
     @ObservedObject private var settings = BubbleSettings.shared
+    @ObservedObject private var pet = PetController.shared
+    @ObservedObject private var chat = ChatSettings.shared
     @State private var dragging: BubbleToken?
     @State private var iconPickerKind: AgentKind?
 
     var body: some View {
         Form {
-            paletteSection
-            canvasSection
-            agentIconsSection
-            appearanceSection
-            filterSection
+            modeSection
+            if settings.multiAgentBubbleEnabled {
+                paletteSection
+                canvasSection
+                agentIconsSection
+                appearanceSection
+                filterSection
+            } else {
+                defaultBubbleSection
+            }
         }
         .formStyle(.grouped)
         .popover(item: $iconPickerKind) { kind in
             IconPickerPopover(kind: kind)
+        }
+    }
+
+    // MARK: Mode toggle
+
+    private var modeSection: some View {
+        Section {
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Multi-agent bubble")
+                    Text("Show all active agents with icons, state dots, and custom layout.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+                Spacer()
+                ColorSwitch(isOn: $settings.multiAgentBubbleEnabled)
+            }
+        } header: {
+            Text("Bubble mode")
+        }
+    }
+
+    // MARK: Default mode config (shown when multi-agent is OFF)
+
+    private var defaultBubbleSection: some View {
+        Section("Default bubble") {
+            HStack {
+                Text("Show chat bubble")
+                Spacer()
+                ColorSwitch(isOn: $pet.showChat)
+            }
+            Picker("Messages", selection: $chat.source) {
+                Text("System").tag(ChatSettings.Source.system)
+                Text("Custom").tag(ChatSettings.Source.custom)
+            }
+            .pickerStyle(.segmented)
+            if chat.source == .custom {
+                ForEach(ChatSettings.editableMoods, id: \.self) { mood in
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(moodLabel(mood)).font(.caption).foregroundStyle(.secondary)
+                        GrowingTextEditor(text: Binding(
+                            get: { chat.text(for: mood) },
+                            set: { chat.setText($0, for: mood) }
+                        ))
+                        .padding(4)
+                        .background(RoundedRectangle(cornerRadius: 6).fill(Color(white: 0.16)))
+                        .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(.white.opacity(0.12)))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                }
+                HStack {
+                    Text("One message per line; a random one is shown.")
+                        .font(.caption).foregroundStyle(.secondary)
+                    Spacer()
+                    Button("Reset to defaults") { chat.resetToDefaults() }
+                        .controlSize(.small)
+                }
+            }
+        }
+    }
+
+    private func moodLabel(_ mood: PetMood) -> String {
+        switch mood {
+        case .working:   return "Working"
+        case .waiting:   return "Waiting"
+        case .done:      return "Done"
+        case .celebrate: return "Celebrate"
+        case .idle:      return "Idle"
         }
     }
 
@@ -243,7 +317,6 @@ struct BubbleSettingsView: View {
                 }
             }
 
-            Toggle("Use multi-agent bubble", isOn: $settings.multiAgentBubbleEnabled)
             Toggle("Group by agent kind", isOn: $settings.groupByKind)
             Toggle("Collapse same session id", isOn: $settings.collapseDuplicates)
 
