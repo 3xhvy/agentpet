@@ -18,6 +18,9 @@ final class SettingsModel: ObservableObject {
 
     @Published private(set) var notificationState: NotificationState = .notDetermined
     @Published private(set) var installedKinds: Set<AgentKind> = []
+    /// Surfaced when an install/uninstall fails (e.g. an agent's settings file is
+    /// not valid JSON), so the user sees why instead of a silent no-op.
+    @Published var installError: String?
 
     /// In-app notification toggle: lets users mute alerts even after granting
     /// the macOS permission. Defaults to on.
@@ -72,10 +75,19 @@ final class SettingsModel: ObservableObject {
 
     func toggleInstall(_ kind: AgentKind) {
         guard let spec = AgentHooks.spec(for: kind) else { return }
-        if installedKinds.contains(kind) {
-            try? HookInstaller.uninstallFromDisk(path: spec.settingsPath, events: spec.events, style: spec.style)
-        } else {
-            try? HookInstaller.installToDisk(command: hookCommand(for: kind), path: spec.settingsPath, events: spec.events, style: spec.style)
+        installError = nil
+        do {
+            if installedKinds.contains(kind) {
+                try HookInstaller.uninstallFromDisk(path: spec.settingsPath, events: spec.events, style: spec.style)
+            } else {
+                try HookInstaller.installToDisk(command: hookCommand(for: kind), path: spec.settingsPath, events: spec.events, style: spec.style)
+                // Codex ignores our hooks.json unless its hooks feature is on.
+                if kind == .codex {
+                    try CodexHookConfig.enableHooksOnDisk()
+                }
+            }
+        } catch {
+            installError = error.localizedDescription
         }
         refresh()
     }

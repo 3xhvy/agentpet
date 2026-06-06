@@ -283,6 +283,9 @@ private struct GeneralTab: View {
                         }
                     }
                 }
+                if let err = model.installError {
+                    Text(err).font(.caption).foregroundStyle(.red).textSelection(.enabled)
+                }
             }
 
             Section("About") {
