@@ -73,6 +73,23 @@ final class SessionStoreTests: XCTestCase {
         XCTAssertEqual(store.sessions.count, 1)
     }
 
+    func testApplyCarriesAndRetainsContextPercentage() {
+        let store = SessionStore()
+        let first = AgentEvent(
+            sessionId: "s1",
+            agentKind: .claude,
+            eventName: "UserPromptSubmit",
+            project: "/proj",
+            contextPercentage: 42.4,
+            timestamp: t0
+        )
+        store.apply(first, now: t0)
+
+        let updated = store.apply(event("PreToolUse"), now: t0.addingTimeInterval(5))
+
+        XCTAssertEqual(updated?.contextPercentage, 42.4)
+    }
+
     func testApplyIgnoresUnmappedEvent() {
         let store = SessionStore()
         XCTAssertNil(store.apply(event("Bogus"), now: t0))

@@ -31,6 +31,12 @@ final class ClaudeHookPayloadTests: XCTestCase {
         XCTAssertTrue(event?.message?.hasSuffix("…") ?? false)
     }
 
+    func testDecodesContextPercentage() {
+        let json = #"{"session_id":"s","hook_event_name":"PreToolUse","context_size_percentage":42.4}"#
+        let event = payload(json)?.makeEvent(now: now)
+        XCTAssertEqual(event?.contextPercentage, 42.4)
+    }
+
     func testIgnoresUnknownFields() {
         // Real Claude payloads carry extra keys (transcript_path, stop_hook_active, ...).
         let event = payload(#"{"session_id":"s","hook_event_name":"Stop","transcript_path":"/t","stop_hook_active":false}"#)?

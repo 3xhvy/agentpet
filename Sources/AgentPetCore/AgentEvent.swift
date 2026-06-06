@@ -9,6 +9,8 @@ public struct AgentEvent: Codable, Sendable, Equatable {
     public var eventName: String
     public var project: String?
     public var message: String?
+    /// Optional current context-window usage percentage for this session.
+    public var contextPercentage: Double?
     /// Path to the agent's conversation transcript file (e.g. Claude Code JSONL).
     /// Used to derive a human-readable title for the session.
     public var transcriptPath: String?
@@ -20,6 +22,7 @@ public struct AgentEvent: Codable, Sendable, Equatable {
         eventName: String,
         project: String? = nil,
         message: String? = nil,
+        contextPercentage: Double? = nil,
         transcriptPath: String? = nil,
         timestamp: Date
     ) {
@@ -28,6 +31,7 @@ public struct AgentEvent: Codable, Sendable, Equatable {
         self.eventName = eventName
         self.project = project
         self.message = message
+        self.contextPercentage = contextPercentage
         self.transcriptPath = transcriptPath
         self.timestamp = timestamp
     }

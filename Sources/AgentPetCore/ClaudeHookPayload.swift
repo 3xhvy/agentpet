@@ -9,6 +9,7 @@ public struct ClaudeHookPayload: Decodable, Equatable {
     public let message: String?
     public let toolName: String?
     public let toolInput: ClaudeToolInput?
+    public let contextPercentage: Double?
     /// Absolute path to the conversation's JSONL transcript file.
     public let transcriptPath: String?
 
@@ -19,7 +20,27 @@ public struct ClaudeHookPayload: Decodable, Equatable {
         case message
         case toolName = "tool_name"
         case toolInput = "tool_input"
+        case contextSizePercentage = "context_size_percentage"
+        case contextPercentage = "context_percentage"
+        case contextPercent = "context_percent"
+        case contextUsagePercentage = "context_usage_percentage"
         case transcriptPath = "transcript_path"
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        sessionId = try c.decodeIfPresent(String.self, forKey: .sessionId)
+        cwd = try c.decodeIfPresent(String.self, forKey: .cwd)
+        hookEventName = try c.decodeIfPresent(String.self, forKey: .hookEventName)
+        message = try c.decodeIfPresent(String.self, forKey: .message)
+        toolName = try c.decodeIfPresent(String.self, forKey: .toolName)
+        toolInput = try c.decodeIfPresent(ClaudeToolInput.self, forKey: .toolInput)
+        transcriptPath = try c.decodeIfPresent(String.self, forKey: .transcriptPath)
+        contextPercentage =
+            Self.decodePercent(from: c, forKey: .contextSizePercentage)
+            ?? Self.decodePercent(from: c, forKey: .contextPercentage)
+            ?? Self.decodePercent(from: c, forKey: .contextPercent)
+            ?? Self.decodePercent(from: c, forKey: .contextUsagePercentage)
     }
 
     public static func decode(from data: Data) -> ClaudeHookPayload? {
@@ -39,7 +60,24 @@ public struct ClaudeHookPayload: Decodable, Equatable {
         ) ?? toolName.map { "Using \($0)" }
         return AgentEvent(
             sessionId: sessionId, agentKind: kind, eventName: hookEventName,
-            project: cwd, message: context, transcriptPath: transcriptPath, timestamp: now
+            project: cwd,
+            message: context,
+            contextPercentage: contextPercentage,
+            transcriptPath: transcriptPath,
+            timestamp: now
         )
+    }
+
+    private static func decodePercent(
+        from container: KeyedDecodingContainer<CodingKeys>,
+        forKey key: CodingKeys
+    ) -> Double? {
+        if let value = try? container.decodeIfPresent(Double.self, forKey: key) {
+            return value
+        }
+        if let value = try? container.decodeIfPresent(String.self, forKey: key) {
+            return Double(value)
+        }
+        return nil
     }
 }

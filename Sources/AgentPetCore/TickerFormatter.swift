@@ -32,6 +32,13 @@ public enum TickerFormatter {
         return "\(label) [\(project)] → \(msg)"
     }
 
+    /// Bare context-window usage text, e.g. `42%`, for row tokens.
+    public static func contextPercentageText(for session: AgentSession) -> String? {
+        guard let value = session.contextPercentage, value.isFinite else { return nil }
+        let rounded = Int(value.rounded())
+        return "\(min(100, max(0, rounded)))%"
+    }
+
     /// Sort order for the ticker: waiting first, then working (most-recently
     /// updated first), then done. Idle and registered sessions are excluded
     /// before calling this — the caller is responsible for filtering.

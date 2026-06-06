@@ -372,6 +372,7 @@ private struct BubbleRowPreview: View {
     private let mockTitle    = "Fix login bug"
     private let mockProject  = "agentpet"
     private let mockMessage  = "Editing SettingsModel.swift"
+    private let mockContext  = "42%"
     private let mockElapsed  = "3m"
 
     var body: some View {
@@ -430,6 +431,11 @@ private struct BubbleRowPreview: View {
                 .lineLimit(1)
                 .truncationMode(.tail)
                 .layoutPriority(1)
+        case .contextPercentage:
+            Text(mockContext)
+                .font(.system(size: settings.fontSize.secondaryPt, weight: .semibold))
+                .foregroundStyle(.secondary)
+                .monospacedDigit()
         case .stateLabel:
             Text("Working")
                 .font(.system(size: settings.fontSize.secondaryPt))

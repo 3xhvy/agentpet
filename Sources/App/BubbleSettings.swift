@@ -5,7 +5,7 @@ import AgentPetCore
 // MARK: - Token types
 
 enum BubbleToken: String, CaseIterable, Codable, Identifiable {
-    case dot, icon, title, project, separator, message, stateLabel, elapsed
+    case dot, icon, title, project, separator, message, contextPercentage, stateLabel, elapsed
     var id: String { rawValue }
 
     var displayName: String {
@@ -16,6 +16,8 @@ enum BubbleToken: String, CaseIterable, Codable, Identifiable {
         case .project:    return "Project folder"
         case .separator:  return "Separator"
         case .message:    return "Activity message"
+        case .contextPercentage:
+            return "Context percentage"
         case .stateLabel: return "State label"
         case .elapsed:    return "Elapsed time"
         }
@@ -29,6 +31,8 @@ enum BubbleToken: String, CaseIterable, Codable, Identifiable {
         case .project:    return "Project"
         case .separator:  return "Sep"
         case .message:    return "Message"
+        case .contextPercentage:
+            return "Context %"
         case .stateLabel: return "State"
         case .elapsed:    return "Elapsed"
         }
@@ -42,6 +46,8 @@ enum BubbleToken: String, CaseIterable, Codable, Identifiable {
         case .project:    return "folder.fill"
         case .separator:  return "arrow.right"
         case .message:    return "bubble.left.fill"
+        case .contextPercentage:
+            return "percent"
         case .stateLabel: return "tag.fill"
         case .elapsed:    return "clock.fill"
         }
@@ -55,6 +61,8 @@ enum BubbleToken: String, CaseIterable, Codable, Identifiable {
         case .project:    return .green
         case .separator:  return .gray
         case .message:    return .indigo
+        case .contextPercentage:
+            return .cyan
         case .stateLabel: return .yellow
         case .elapsed:    return .teal
         }
@@ -77,6 +85,7 @@ struct BubbleLayout: Codable, Equatable {
         .init(token: .separator,  isVisible: true),
         .init(token: .message,    isVisible: true),
         .init(token: .title,      isVisible: false),
+        .init(token: .contextPercentage, isVisible: false),
         .init(token: .stateLabel, isVisible: false),
         .init(token: .elapsed,    isVisible: false),
     ])
@@ -88,6 +97,7 @@ struct BubbleLayout: Codable, Equatable {
         .init(token: .project,    isVisible: true),
         .init(token: .separator,  isVisible: true),
         .init(token: .message,    isVisible: true),
+        .init(token: .contextPercentage, isVisible: false),
         .init(token: .stateLabel, isVisible: false),
         .init(token: .elapsed,    isVisible: false),
     ])
@@ -99,6 +109,7 @@ struct BubbleLayout: Codable, Equatable {
         .init(token: .project,    isVisible: true),
         .init(token: .separator,  isVisible: true),
         .init(token: .message,    isVisible: true),
+        .init(token: .contextPercentage, isVisible: true),
         .init(token: .stateLabel, isVisible: true),
         .init(token: .elapsed,    isVisible: true),
     ])

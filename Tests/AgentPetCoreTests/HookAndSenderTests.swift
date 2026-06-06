@@ -4,10 +4,12 @@ import XCTest
 final class HookArgumentsTests: XCTestCase {
     func testParseAllFlags() {
         let args = ["--event", "Stop", "--session", "s1", "--project", "/p",
-                    "--agent", "claude", "--message", "hello world"]
+                    "--agent", "claude", "--message", "hello world",
+                    "--context-percent", "42"]
         let parsed = HookArguments.parse(args)
         XCTAssertEqual(parsed, HookArguments(
-            event: "Stop", session: "s1", project: "/p", agent: "claude", message: "hello world"
+            event: "Stop", session: "s1", project: "/p", agent: "claude",
+            message: "hello world", contextPercentage: 42
         ))
     }
 
@@ -29,6 +31,16 @@ final class HookArgumentsTests: XCTestCase {
         XCTAssertEqual(event?.agentKind, .claude)
         XCTAssertEqual(event?.eventName, "Stop")
         XCTAssertEqual(event?.timestamp, now)
+    }
+
+    func testMakeEventCarriesContextPercentage() {
+        let now = Date(timeIntervalSince1970: 1)
+        let event = HookArguments(
+            event: "UserPromptSubmit",
+            session: "s1",
+            contextPercentage: 42.4
+        ).makeEvent(now: now)
+        XCTAssertEqual(event?.contextPercentage, 42.4)
     }
 }
 

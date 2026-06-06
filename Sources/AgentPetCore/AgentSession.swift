@@ -12,6 +12,8 @@ public struct AgentSession: Identifiable, Sendable, Equatable {
     public var message: String?
     public var source: AgentSource
     public var updatedAt: Date
+    /// Optional current context-window usage percentage for display.
+    public var contextPercentage: Double?
     /// When the session entered its current `state`; resets on state change.
     public var stateSince: Date
 
@@ -24,6 +26,7 @@ public struct AgentSession: Identifiable, Sendable, Equatable {
         message: String? = nil,
         source: AgentSource,
         updatedAt: Date,
+        contextPercentage: Double? = nil,
         stateSince: Date? = nil
     ) {
         self.id = id
@@ -34,6 +37,7 @@ public struct AgentSession: Identifiable, Sendable, Equatable {
         self.message = message
         self.source = source
         self.updatedAt = updatedAt
+        self.contextPercentage = contextPercentage
         self.stateSince = stateSince ?? updatedAt
     }
 }

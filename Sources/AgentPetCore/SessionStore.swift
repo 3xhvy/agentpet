@@ -76,6 +76,9 @@ public final class SessionStore {
             if let project = event.project { existing.project = project }
             existing.message = resolvedMessage
             if let t = resolvedTitle { existing.title = t }
+            if let contextPercentage = event.contextPercentage {
+                existing.contextPercentage = contextPercentage
+            }
             byID[event.sessionId] = existing
             return existing
         }
@@ -87,7 +90,8 @@ public final class SessionStore {
             state: state,
             message: resolvedMessage,
             source: .hook,
-            updatedAt: now
+            updatedAt: now,
+            contextPercentage: event.contextPercentage
         )
         byID[event.sessionId] = session
         return session

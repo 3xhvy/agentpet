@@ -73,6 +73,31 @@ final class TickerFormatterTests: XCTestCase {
         XCTAssertEqual(TickerFormatter.line(for: session), "Agent [my-session-id] → running")
     }
 
+    func testContextPercentageTextRoundsAndOmitsSuffix() {
+        let session = AgentSession(
+            id: "s1",
+            agentKind: .claude,
+            state: .working,
+            source: .hook,
+            updatedAt: Date(),
+            contextPercentage: 42.4
+        )
+
+        XCTAssertEqual(TickerFormatter.contextPercentageText(for: session), "42%")
+    }
+
+    func testContextPercentageTextIsNilWhenMissing() {
+        let session = AgentSession(
+            id: "s1",
+            agentKind: .claude,
+            state: .working,
+            source: .hook,
+            updatedAt: Date()
+        )
+
+        XCTAssertNil(TickerFormatter.contextPercentageText(for: session))
+    }
+
     // MARK: sorted(_:)
 
     func testSortedWaitingFirst() {

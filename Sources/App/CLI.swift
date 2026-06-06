@@ -15,7 +15,7 @@ enum HookCLI {
 
         guard let event else {
             FileHandle.standardError.write(Data(
-                "usage: agentpet hook --event <name> --session <id> [--project <path>] [--agent <kind>] [--message <text>]\n         or pipe a Claude Code hook JSON payload on stdin\n".utf8
+                "usage: agentpet hook --event <name> --session <id> [--project <path>] [--agent <kind>] [--message <text>] [--context-percent <n>]\n         or pipe a Claude Code hook JSON payload on stdin\n".utf8
             ))
             exit(2)
         }

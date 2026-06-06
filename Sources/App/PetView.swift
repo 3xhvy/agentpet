@@ -319,6 +319,14 @@ private struct AgentRow: View {
                 .truncationMode(.tail)
                 .layoutPriority(-1)
                 .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
+        case .contextPercentage:
+            if let text = TickerFormatter.contextPercentageText(for: session) {
+                Text(text)
+                    .font(.system(size: secondaryPt, weight: .semibold))
+                    .foregroundStyle(textColor(0.58))
+                    .monospacedDigit()
+                    .fixedSize(horizontal: true, vertical: false)
+            }
         case .stateLabel:
             Text(session.state.rawValue.capitalized)
                 .font(.system(size: secondaryPt, weight: .regular))
@@ -333,6 +341,9 @@ private struct AgentRow: View {
 
     private func tokenHasValue(_ token: BubbleToken) -> Bool {
         if token == .title { return session.title != nil }
+        if token == .contextPercentage {
+            return TickerFormatter.contextPercentageText(for: session) != nil
+        }
         return true
     }
 
@@ -578,4 +589,3 @@ private struct WaitingTextFlash: ViewModifier {
         }
     }
 }
-
