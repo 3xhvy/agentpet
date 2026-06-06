@@ -23,6 +23,6 @@ export const GET: APIRoute = async () => {
   }
 
   return new Response(JSON.stringify({ pets, fans }), {
-    headers: { "content-type": "application/json", "cache-control": "public, max-age=120" },
+    headers: { "content-type": "application/json", "cache-control": "public, max-age=30" },
   });
 };
