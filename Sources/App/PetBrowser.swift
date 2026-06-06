@@ -8,6 +8,13 @@ struct RemotePet: Decodable, Identifiable {
     let submittedBy: String?
     let spritesheetUrl: String
     let petJsonUrl: String
+    /// Set after decoding for pets from the AgentPet community gallery (not the
+    /// upstream Petdex library); drives the "Community" badge in the UI.
+    var isCommunity = false
+
+    private enum CodingKeys: String, CodingKey {
+        case slug, displayName, kind, submittedBy, spritesheetUrl, petJsonUrl
+    }
 
     var id: String { slug }
     var name: String { displayName ?? slug }
@@ -33,14 +40,19 @@ final class PetBrowser: ObservableObject {
     @Published var category = "all"   // all / character / creature / object
     @Published var downloading: Set<String> = []
     @Published var installed: Set<String> = []
+    /// A transient per-download failure, shown as a banner without hiding the list.
+    @Published var downloadError: String?
 
     static let categories: [(label: String, value: String)] = [
         ("All", "all"), ("Characters", "character"), ("Creatures", "creature"), ("Objects", "object"),
     ]
 
-    // Pet library is the public Petdex manifest API (see README acknowledgements).
-    // The in-app feature is branded "Browse pets"; the source is credited in the repo.
-    private static let manifestURL = URL(string: "https://petdex.crafter.run/api/manifest")!
+    // Two sources, merged into one list:
+    //  • Petdex — via our caching proxy (rewrites asset URLs through R2 so we
+    //    don't hit Petdex's rate-limited CDN; see README acknowledgements).
+    //  • Community — pets uploaded to AgentPet's own gallery, surfaced first.
+    private static let petdexURL = URL(string: "https://pets.thenightwatcher.online/manifest.json")!
+    private static let communityURL = URL(string: "https://agentpet.thenightwatcher.online/api/pets")!
 
     private struct Manifest: Decodable {
         let pets: [RemotePet]
@@ -67,19 +79,42 @@ final class PetBrowser: ObservableObject {
         isLoading = true
         errorText = nil
         Task {
-            do {
-                let (data, _) = try await URLSession.shared.data(from: Self.manifestURL)
-                let manifest = try JSONDecoder().decode(Manifest.self, from: data)
-                self.pets = manifest.pets
-            } catch {
+            // Fetch both sources concurrently; either failing alone is tolerated.
+            async let community = Self.fetch(Self.communityURL, isCommunity: true)
+            async let library = Self.fetch(Self.petdexURL, isCommunity: false)
+            // Shuffle the library so the order isn't identical to the source site;
+            // community pets stay first. Shuffled once per load.
+            let merged = Self.dedupe(await community + (await library).shuffled())
+            if merged.isEmpty {
                 self.errorText = "Couldn't load the pet library. Check your connection."
+            } else {
+                self.pets = merged
             }
             self.isLoading = false
         }
     }
 
+    /// Loads one manifest; returns `[]` on any failure so the other source still shows.
+    private static func fetch(_ url: URL, isCommunity: Bool) async -> [RemotePet] {
+        do {
+            let (data, _) = try await URLSession.shared.data(from: url)
+            var list = try JSONDecoder().decode(Manifest.self, from: data).pets
+            if isCommunity { for i in list.indices { list[i].isCommunity = true } }
+            return list
+        } catch {
+            return []
+        }
+    }
+
+    /// Keeps the first occurrence of each slug (community entries come first).
+    private static func dedupe(_ list: [RemotePet]) -> [RemotePet] {
+        var seen = Set<String>()
+        return list.filter { seen.insert($0.slug).inserted }
+    }
+
     func download(_ pet: RemotePet) {
         guard !downloading.contains(pet.slug) else { return }
+        downloadError = nil
         downloading.insert(pet.slug)
         Task {
             await performDownload(pet)
@@ -90,13 +125,15 @@ final class PetBrowser: ObservableObject {
     private func performDownload(_ pet: RemotePet) async {
         guard let petJsonURL = URL(string: pet.petJsonUrl),
               let sheetURL = URL(string: pet.spritesheetUrl) else { return }
-        let id = await PetInstaller.download(slug: pet.slug, petJsonURL: petJsonURL, spritesheetURL: sheetURL)
-        guard let id else {
-            errorText = "Download failed for \(pet.name)."
-            return
+        do {
+            let id = try await PetInstaller.download(slug: pet.slug, petJsonURL: petJsonURL, spritesheetURL: sheetURL)
+            ImagePetStore.shared.reload()
+            installed.insert(pet.slug)
+            PetController.shared.selectedPetID = id
+            downloadError = nil
+        } catch {
+            // A single failed download must not blank the whole gallery.
+            downloadError = PetInstaller.message(for: error, pet: pet.name)
         }
-        ImagePetStore.shared.reload()
-        installed.insert(pet.slug)
-        PetController.shared.selectedPetID = id
     }
 }

@@ -31,7 +31,7 @@ Running multiple agents in parallel means constantly switching windows to check 
 - **At-a-glance menu bar icon**: shows the number of running agents, and turns **orange with a count** when one needs your input.
 - **Desktop pet** that reacts to the aggregate state (working / waiting / done / celebrate), with an optional **chat bubble** (built-in or fully custom messages).
 - **Native notifications** when an agent finishes or needs input.
-- **Claude Code, Codex, Gemini CLI, Cursor, opencode & Windsurf** integration via hooks, with one-tap install from Settings (precise working / waiting / done / idle, including "needs your input"). GLM (Z.AI) works through Claude Code automatically. Cursor and Windsurf report working/done (they have no "needs input" hook).
+- **Claude Code, Codex, Gemini CLI, Cursor, opencode, Windsurf & Antigravity** integration via hooks, with one-tap install from Settings (precise working / waiting / done / idle, including "needs your input"). GLM (Z.AI) works through Claude Code automatically. Cursor, Windsurf and Antigravity report working/done (they have no "needs input" hook).
 - **Universal wrapper** `agentpet run -- <command>` to monitor *any* CLI agent (working/done), no per-agent setup.
 - **Pet system**: browse an online pet library and download with one click, map each animation to a state, resize, and customise chat lines.
 - **Polished, native Settings** (tabbed, dark) that never steals focus.

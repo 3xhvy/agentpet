@@ -11,6 +11,10 @@ public enum HookStyle: Sendable {
     case windsurfFlat
     /// opencode: a JS plugin file dropped in `~/.config/opencode/plugin/`.
     case opencodePlugin
+    /// Antigravity `~/.gemini/config/hooks.json`: like claudeNested but the event
+    /// map lives under a named hook group instead of a top-level `"hooks"` key:
+    /// `{"agentpet": {Event: [{"hooks": [{"type": "command", "command": ...}]}]}}`.
+    case antigravityNested
 }
 
 /// Where and which lifecycle events to register for an agent.
@@ -57,6 +61,14 @@ public enum AgentHooks {
                 kind: .opencode, style: .opencodePlugin,
                 events: [],
                 settingsPath: home + "/.config/opencode/plugin/agentpet.js")
+        case .antigravity:
+            // Antigravity has no session-start/notification hooks, so we register
+            // for the model-call and tool lifecycle plus Stop. PreInvocation fires
+            // when a turn begins; Stop when the agent loop ends.
+            return AgentHookSpec(
+                kind: .antigravity, style: .antigravityNested,
+                events: ["PreInvocation", "PreToolUse", "PostToolUse", "Stop"],
+                settingsPath: home + "/.gemini/config/hooks.json")
         case .cli, .unknown:
             return nil
         }

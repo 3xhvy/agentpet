@@ -48,42 +48,46 @@ enum SpriteSlicer {
     }
 
     /// Slices a spritesheet into clips (one per sheet row) using alpha gutter
-    /// detection, so no grid metadata is required. Empty rows/cells are skipped.
+    /// detection, so no grid metadata is required. Columns are detected within
+    /// each row, so ragged sheets (rows with different frame counts or unaligned
+    /// columns, e.g. AI-generated sheets) slice correctly. Uniform grids are
+    /// unaffected: every row finds the same columns.
     static func slice(_ image: CGImage, alphaThreshold: UInt8 = 16) -> [[CGImage]] {
         let w = image.width, h = image.height
         guard w > 0, h > 0,
               let data = pixelData(image, width: w, height: h) else { return [] }
 
-        var colHas = [Bool](repeating: false, count: w)
         var rowHas = [Bool](repeating: false, count: h)
         data.withUnsafeBufferPointer { buf in
             for y in 0..<h {
                 let rowStart = y * w * 4
-                var rowAny = false
                 for x in 0..<w where buf[rowStart + x * 4 + 3] > alphaThreshold {
-                    colHas[x] = true
-                    rowAny = true
+                    rowHas[y] = true
+                    break
                 }
-                if rowAny { rowHas[y] = true }
             }
         }
-
-        let colBands = segments(colHas)
         let rowBands = segments(rowHas)
-        guard !colBands.isEmpty, !rowBands.isEmpty else { return [] }
+        guard !rowBands.isEmpty else { return [] }
 
         var clips: [[CGImage]] = []
-        for row in rowBands {
-            var clip: [CGImage] = []
-            for col in colBands {
-                let rect = CGRect(x: col.lower, y: row.lower,
-                                  width: col.upper - col.lower, height: row.upper - row.lower)
-                if cellHasContent(data, width: w, rect: rect, threshold: alphaThreshold),
-                   let cropped = image.cropping(to: rect) {
-                    clip.append(cropped)
+        data.withUnsafeBufferPointer { buf in
+            for row in rowBands {
+                var colHas = [Bool](repeating: false, count: w)
+                for y in row.lower..<row.upper {
+                    let rowStart = y * w * 4
+                    for x in 0..<w where buf[rowStart + x * 4 + 3] > alphaThreshold {
+                        colHas[x] = true
+                    }
                 }
+                var clip: [CGImage] = []
+                for col in segments(colHas) {
+                    let rect = CGRect(x: col.lower, y: row.lower,
+                                      width: col.upper - col.lower, height: row.upper - row.lower)
+                    if let cropped = image.cropping(to: rect) { clip.append(cropped) }
+                }
+                if !clip.isEmpty { clips.append(clip) }
             }
-            if !clip.isEmpty { clips.append(clip) }
         }
         return clips
     }
@@ -110,17 +114,5 @@ enum SpriteSlicer {
         }
         if let s = start { result.append((s, occupancy.count)) }
         return result
-    }
-
-    private static func cellHasContent(_ data: [UInt8], width: Int, rect: CGRect, threshold: UInt8) -> Bool {
-        let x0 = Int(rect.minX), x1 = Int(rect.maxX)
-        let y0 = Int(rect.minY), y1 = Int(rect.maxY)
-        for y in y0..<y1 {
-            let rowStart = y * width * 4
-            for x in x0..<x1 where data[rowStart + x * 4 + 3] > threshold {
-                return true
-            }
-        }
-        return false
     }
 }

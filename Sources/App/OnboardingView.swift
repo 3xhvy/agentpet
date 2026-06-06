@@ -9,6 +9,7 @@ struct OnboardingView: View {
     var onFinish: () -> Void
 
     @State private var browsing = false
+    @State private var creating = false
 
     private var selectedPack: ImagePetPack? {
         pet.selectedPetID.flatMap { imagePets.pack(id: $0) }
@@ -32,12 +33,22 @@ struct OnboardingView: View {
             }
             .padding(EdgeInsets(top: 40, leading: 28, bottom: 28, trailing: 28))
         }
-        .frame(width: 560, height: 640)
+        .frame(width: 640, height: 640)
         .background(Theme.background)
         .preferredColorScheme(.dark)
         .noFocusRing()
         .onAppear { model.refresh() }
         .sheet(isPresented: $browsing) { BrowsePetsView(onClose: { browsing = false }) }
+        .sheet(isPresented: $creating) {
+            CreatePetView(
+                onCreate: { id in
+                    creating = false
+                    imagePets.reload()
+                    pet.selectedPetID = id
+                },
+                onCancel: { creating = false }
+            )
+        }
     }
 
     private var header: some View {
@@ -74,8 +85,13 @@ struct OnboardingView: View {
                     if let d = selectedPack?.description {
                         Text(d).font(.caption).foregroundStyle(.white.opacity(0.6)).lineLimit(3)
                     }
-                    Button { browsing = true } label: {
-                        Label("Browse pets", systemImage: "square.grid.2x2")
+                    HStack {
+                        Button { browsing = true } label: {
+                            Label("Browse pets", systemImage: "square.grid.2x2")
+                        }
+                        Button { creating = true } label: {
+                            Label("Create pet", systemImage: "square.and.pencil")
+                        }
                     }
                     .buttonStyle(.plain).foregroundStyle(Color.systemAccent)
                 }

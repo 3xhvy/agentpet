@@ -44,6 +44,61 @@ final class MultiAgentHookTests: XCTestCase {
         XCTAssertTrue(HookInstaller.isInstalledFlat(in: result, events: events))
     }
 
+    // MARK: - Antigravity named-group shape
+
+    func testAntigravityInstallShape() {
+        let events = AgentHooks.spec(for: .antigravity)!.events
+        let cmd = "\"/x/agentpet\" hook --agent antigravity"
+        let result = HookInstaller.installAntigravity(into: [:], command: cmd, events: events)
+        XCTAssertNil(result["hooks"], "Antigravity nests under a named group, not \"hooks\"")
+        let group = result[HookInstaller.antigravityGroup] as? [String: Any]
+        let stop = group?["Stop"] as? [[String: Any]]
+        XCTAssertEqual(stop?.count, 1)
+        let inner = stop?.first?["hooks"] as? [[String: Any]]
+        XCTAssertEqual(inner?.first?["type"] as? String, "command")
+        XCTAssertEqual(inner?.first?["command"] as? String, cmd)
+        XCTAssertTrue(HookInstaller.isInstalledAntigravity(in: result, events: events))
+    }
+
+    func testAntigravityIdempotentAndForeignPreserved() {
+        let events = AgentHooks.spec(for: .antigravity)!.events
+        let cmd = "\"/x/agentpet\" hook --agent antigravity"
+        // A foreign hook group plus a foreign entry under one of our events.
+        let existing: [String: Any] = [
+            "my-linter": ["PostToolUse": [["hooks": [["type": "command", "command": "lint.sh"]]]]],
+            HookInstaller.antigravityGroup: ["Stop": [["hooks": [["type": "command", "command": "echo hi"]]]]],
+        ]
+        let once = HookInstaller.installAntigravity(into: existing, command: cmd, events: events)
+        let twice = HookInstaller.installAntigravity(into: once, command: cmd, events: events)
+        let group = twice[HookInstaller.antigravityGroup] as? [String: Any]
+        let stop = group?["Stop"] as? [[String: Any]]
+        XCTAssertEqual(stop?.count, 2, "foreign Stop entry + ours, no duplicate")
+        XCTAssertNotNil(twice["my-linter"], "foreign hook group untouched")
+        let removed = HookInstaller.uninstallAntigravity(from: twice, events: events)
+        let stopAfter = (removed[HookInstaller.antigravityGroup] as? [String: Any])?["Stop"] as? [[String: Any]]
+        XCTAssertEqual(stopAfter?.count, 1, "foreign Stop entry kept")
+        XCTAssertNotNil(removed["my-linter"], "foreign hook group still kept")
+        XCTAssertFalse(HookInstaller.isInstalledAntigravity(in: removed, events: events))
+    }
+
+    func testAntigravityStateMapping() {
+        XCTAssertEqual(StateMapper.state(for: .antigravity, eventName: "PreInvocation"), .working)
+        XCTAssertEqual(StateMapper.state(for: .antigravity, eventName: "PreToolUse"), .working)
+        XCTAssertEqual(StateMapper.state(for: .antigravity, eventName: "Stop"), .done)
+        XCTAssertNil(StateMapper.state(for: .antigravity, eventName: "Unknown"))
+    }
+
+    func testAntigravityPayloadDecode() {
+        // Antigravity's hooks.json mirrors Claude Code's, so its stdin payload is
+        // decoded with the Claude field convention (snake_case).
+        let json = #"{"session_id":"ag1","hook_event_name":"PreToolUse","cwd":"/proj","tool_name":"Bash"}"#
+        let ev = HookPayload.event(forAgent: .antigravity, stdin: Data(json.utf8), now: Date())
+        XCTAssertEqual(ev?.sessionId, "ag1")
+        XCTAssertEqual(ev?.eventName, "PreToolUse")
+        XCTAssertEqual(ev?.project, "/proj")
+        XCTAssertEqual(ev?.agentKind, .antigravity)
+    }
+
     // MARK: - opencode plugin
 
     func testOpencodeBinaryPathExtraction() {
@@ -128,7 +183,7 @@ final class MultiAgentHookTests: XCTestCase {
     func testDiskRoundTripAllStyles() throws {
         let tmp = NSTemporaryDirectory() + "agentpet-test-\(UUID().uuidString)/"
         defer { try? FileManager.default.removeItem(atPath: tmp) }
-        let cases: [(AgentKind, String)] = [(.cursor, "cursor.json"), (.windsurf, "windsurf.json"), (.opencode, "plugin/agentpet.js")]
+        let cases: [(AgentKind, String)] = [(.cursor, "cursor.json"), (.windsurf, "windsurf.json"), (.opencode, "plugin/agentpet.js"), (.antigravity, "config/hooks.json")]
         for (kind, file) in cases {
             let spec = AgentHooks.spec(for: kind)!
             let path = tmp + file

@@ -15,3 +15,8 @@ xcuserdata/
 
 # Brainstorm scratch
 .superpowers/
+
+# Cloudflare Pages local dev state
+landing/.wrangler/
+landing/node_modules/
+.wrangler/

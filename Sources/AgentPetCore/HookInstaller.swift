@@ -1,5 +1,19 @@
 import Foundation
 
+/// Thrown when an agent's settings file exists but cannot be parsed as a JSON
+/// object. Rewriting it anyway would replace whatever the user had with just
+/// AgentPet's hooks, so install/uninstall refuse instead.
+public enum HookInstallerError: LocalizedError, Equatable {
+    case unreadableSettings(path: String)
+
+    public var errorDescription: String? {
+        switch self {
+        case .unreadableSettings(let path):
+            return "\(path) is not valid JSON; fix or remove it and try again."
+        }
+    }
+}
+
 /// Installs/removes AgentPet's hook entries in an agent's config. Claude Code,
 /// Codex, and Gemini share the nested `{"hooks": {...}}` shape; Cursor and
 /// Windsurf use flatter JSON shapes; opencode uses a JS plugin file. The shape
@@ -59,6 +73,47 @@ public enum HookInstaller {
     private static func groupIsOurs(_ group: [String: Any]) -> Bool {
         guard let inner = group["hooks"] as? [[String: Any]] else { return false }
         return inner.contains { ($0["command"] as? String).map(isOurs) ?? false }
+    }
+
+    // MARK: - Antigravity named-group shape (~/.gemini/config/hooks.json)
+    // Same per-event structure as Claude-nested, but the event map sits under a
+    // named hook group key instead of "hooks", alongside any other user groups:
+    // {"agentpet": {Event: [{"hooks": [{"type": "command", "command": ...}]}]}}
+
+    /// The hook-group key AgentPet owns in an Antigravity hooks.json.
+    public static let antigravityGroup = "agentpet"
+
+    public static func installAntigravity(into settings: [String: Any], command: String, events: [String]) -> [String: Any] {
+        var settings = settings
+        var group = settings[antigravityGroup] as? [String: Any] ?? [:]
+        for event in events {
+            var groups = (group[event] as? [[String: Any]] ?? []).filter { !groupIsOurs($0) }
+            groups.append(["hooks": [["type": "command", "command": command]]])
+            group[event] = groups
+        }
+        settings[antigravityGroup] = group
+        return settings
+    }
+
+    public static func uninstallAntigravity(from settings: [String: Any], events: [String]) -> [String: Any] {
+        var settings = settings
+        guard var group = settings[antigravityGroup] as? [String: Any] else { return settings }
+        for event in events {
+            guard let groups = group[event] as? [[String: Any]] else { continue }
+            let kept = groups.filter { !groupIsOurs($0) }
+            if kept.isEmpty { group.removeValue(forKey: event) } else { group[event] = kept }
+        }
+        if group.isEmpty { settings.removeValue(forKey: antigravityGroup) } else { settings[antigravityGroup] = group }
+        return settings
+    }
+
+    public static func isInstalledAntigravity(in settings: [String: Any], events: [String]) -> Bool {
+        guard let group = settings[antigravityGroup] as? [String: Any] else { return false }
+        for event in events {
+            guard let groups = group[event] as? [[String: Any]] else { continue }
+            if groups.contains(where: groupIsOurs) { return true }
+        }
+        return false
     }
 
     // MARK: - Flat shape (Cursor / Windsurf): {"hooks": {event: [{"command": ...}]}}
@@ -149,10 +204,14 @@ public enum HookInstaller {
 
     // MARK: - Disk IO
 
-    public static func readSettings(path: String) -> [String: Any] {
-        guard let data = FileManager.default.contents(atPath: path),
-              let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
-        else { return [:] }
+    /// Reads an agent's settings file. A missing or empty file is an empty
+    /// config; a file with content that does not parse as a JSON object throws,
+    /// so callers never rewrite (and thereby wipe) settings they could not read.
+    public static func readSettings(path: String) throws -> [String: Any] {
+        guard let data = FileManager.default.contents(atPath: path), !data.isEmpty else { return [:] }
+        guard let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            throw HookInstallerError.unreadableSettings(path: path)
+        }
         return obj
     }
 
@@ -160,7 +219,8 @@ public enum HookInstaller {
         let dir = (path as NSString).deletingLastPathComponent
         try FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
         let data = try JSONSerialization.data(withJSONObject: settings, options: [.prettyPrinted, .sortedKeys])
-        try data.write(to: URL(fileURLWithPath: path))
+        // Atomic so a crash mid-write can never leave a truncated settings file.
+        try data.write(to: URL(fileURLWithPath: path), options: .atomic)
     }
 
     public static func installToDisk(command: String, path: String = defaultSettingsPath(),
@@ -170,11 +230,13 @@ public enum HookInstaller {
             try writeSettings(install(into: readSettings(path: path), command: command, events: events), path: path)
         case .cursorFlat, .windsurfFlat:
             try writeSettings(installFlat(into: readSettings(path: path), command: command, events: events, style: style), path: path)
+        case .antigravityNested:
+            try writeSettings(installAntigravity(into: readSettings(path: path), command: command, events: events), path: path)
         case .opencodePlugin:
             let dir = (path as NSString).deletingLastPathComponent
             try FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
             let js = opencodePlugin(binary: binaryPath(fromCommand: command))
-            try Data(js.utf8).write(to: URL(fileURLWithPath: path))
+            try Data(js.utf8).write(to: URL(fileURLWithPath: path), options: .atomic)
         }
     }
 
@@ -185,6 +247,8 @@ public enum HookInstaller {
             try writeSettings(uninstall(from: readSettings(path: path), events: events), path: path)
         case .cursorFlat, .windsurfFlat:
             try writeSettings(uninstallFlat(from: readSettings(path: path), events: events), path: path)
+        case .antigravityNested:
+            try writeSettings(uninstallAntigravity(from: readSettings(path: path), events: events), path: path)
         case .opencodePlugin:
             if isInstalledOnDisk(path: path, events: events, style: style) {
                 try? FileManager.default.removeItem(atPath: path)
@@ -196,9 +260,11 @@ public enum HookInstaller {
                                          events: [String] = events, style: HookStyle = .claudeNested) -> Bool {
         switch style {
         case .claudeNested:
-            return isInstalled(in: readSettings(path: path), events: events)
+            return isInstalled(in: (try? readSettings(path: path)) ?? [:], events: events)
         case .cursorFlat, .windsurfFlat:
-            return isInstalledFlat(in: readSettings(path: path), events: events)
+            return isInstalledFlat(in: (try? readSettings(path: path)) ?? [:], events: events)
+        case .antigravityNested:
+            return isInstalledAntigravity(in: (try? readSettings(path: path)) ?? [:], events: events)
         case .opencodePlugin:
             guard let s = try? String(contentsOfFile: path, encoding: .utf8) else { return false }
             return isOurs(s)

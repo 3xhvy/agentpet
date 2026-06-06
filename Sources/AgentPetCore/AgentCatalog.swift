@@ -27,5 +27,7 @@ public enum AgentCatalog {
         AgentIntegration(kind: .opencode, displayName: "opencode", isSupported: true),
         AgentIntegration(kind: .windsurf, displayName: "Windsurf", isSupported: true,
                          note: "No \"needs input\" alerts (Windsurf has no such hook)"),
+        AgentIntegration(kind: .antigravity, displayName: "Antigravity", isSupported: true,
+                         note: "No \"needs input\" alerts (Antigravity has no notification hook)"),
     ]
 }

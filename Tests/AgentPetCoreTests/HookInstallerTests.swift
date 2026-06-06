@@ -57,4 +57,47 @@ final class HookInstallerTests: XCTestCase {
         try HookInstaller.uninstallFromDisk(path: path)
         XCTAssertFalse(HookInstaller.isInstalledOnDisk(path: path))
     }
+
+    // MARK: - Unreadable settings must never be rewritten
+
+    private func tempFile(_ contents: String) throws -> String {
+        let path = NSTemporaryDirectory() + "settings-\(UUID().uuidString).json"
+        try Data(contents.utf8).write(to: URL(fileURLWithPath: path))
+        return path
+    }
+
+    func testInstallRefusesToRewriteUnparseableSettings() throws {
+        let path = try tempFile("{ not json")
+        defer { try? FileManager.default.removeItem(atPath: path) }
+        XCTAssertThrowsError(try HookInstaller.installToDisk(command: cmd, path: path)) {
+            XCTAssertEqual($0 as? HookInstallerError, .unreadableSettings(path: path))
+        }
+        XCTAssertEqual(try String(contentsOfFile: path, encoding: .utf8), "{ not json", "file untouched")
+    }
+
+    func testUninstallRefusesToRewriteUnparseableSettings() throws {
+        let path = try tempFile("{ not json")
+        defer { try? FileManager.default.removeItem(atPath: path) }
+        XCTAssertThrowsError(try HookInstaller.uninstallFromDisk(path: path))
+        XCTAssertEqual(try String(contentsOfFile: path, encoding: .utf8), "{ not json", "file untouched")
+    }
+
+    func testInstallRefusesNonObjectRoot() throws {
+        let path = try tempFile("[1, 2, 3]")
+        defer { try? FileManager.default.removeItem(atPath: path) }
+        XCTAssertThrowsError(try HookInstaller.installToDisk(command: cmd, path: path))
+    }
+
+    func testEmptyFileIsTreatedAsEmptySettings() throws {
+        let path = try tempFile("")
+        defer { try? FileManager.default.removeItem(atPath: path) }
+        try HookInstaller.installToDisk(command: cmd, path: path)
+        XCTAssertTrue(HookInstaller.isInstalledOnDisk(path: path))
+    }
+
+    func testIsInstalledOnDiskIsFalseForUnreadableSettings() throws {
+        let path = try tempFile("{ not json")
+        defer { try? FileManager.default.removeItem(atPath: path) }
+        XCTAssertFalse(HookInstaller.isInstalledOnDisk(path: path))
+    }
 }
