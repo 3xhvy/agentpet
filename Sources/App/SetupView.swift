@@ -179,7 +179,6 @@ private struct SoundRow: View {
 private struct GeneralTab: View {
     @ObservedObject var model: SettingsModel
     @ObservedObject var pet: PetController
-    @ObservedObject private var chat = ChatSettings.shared
     @ObservedObject private var sound = SoundSettings.shared
     // Local mirror of the system login-item state so the toggle re-renders
     // reliably (the SMAppService status isn't observable on its own).
@@ -212,41 +211,6 @@ private struct GeneralTab: View {
                     }
                     Spacer()
                     notificationButton
-                }
-            }
-
-            Section("Pet chat") {
-                HStack {
-                    Text("Show chat bubble")
-                    Spacer()
-                    ColorSwitch(isOn: $pet.showChat)
-                }
-                Picker("Messages", selection: $chat.source) {
-                    Text("System").tag(ChatSettings.Source.system)
-                    Text("Custom").tag(ChatSettings.Source.custom)
-                }
-                .pickerStyle(.segmented)
-                if chat.source == .custom {
-                    ForEach(ChatSettings.editableMoods, id: \.self) { mood in
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(moodLabel(mood)).font(.caption).foregroundStyle(.secondary)
-                            GrowingTextEditor(text: Binding(
-                                get: { chat.text(for: mood) },
-                                set: { chat.setText($0, for: mood) }
-                            ))
-                            .padding(4)
-                            .background(RoundedRectangle(cornerRadius: 6).fill(Color(white: 0.16)))
-                            .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(.white.opacity(0.12)))
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                        }
-                    }
-                    HStack {
-                        Text("One message per line; a random one is shown.")
-                            .font(.caption).foregroundStyle(.secondary)
-                        Spacer()
-                        Button("Reset to defaults") { chat.resetToDefaults() }
-                            .controlSize(.small)
-                    }
                 }
             }
 
@@ -302,15 +266,7 @@ private struct GeneralTab: View {
         .formStyle(.grouped)
     }
 
-    private func moodLabel(_ mood: PetMood) -> String {
-        switch mood {
-        case .working: return "Working"
-        case .waiting: return "Waiting"
-        case .done: return "Done"
-        case .celebrate: return "Celebrate"
-        case .idle: return "Idle"
-        }
-    }
+
 
     private var appVersion: String {
         let v = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.1.0"

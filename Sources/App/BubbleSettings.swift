@@ -270,7 +270,7 @@ final class BubbleSettings: ObservableObject {
         minStateFilter = MinStateFilter(rawValue: ud.string(forKey: Keys.minStateFilter) ?? "") ?? .all
         groupByKind        = ud.bool(forKey: Keys.groupByKind)
         collapseDuplicates = ud.object(forKey: Keys.collapseDuplicates) as? Bool ?? false
-        multiAgentBubbleEnabled = ud.object(forKey: Keys.multiAgentBubbleEnabled) as? Bool ?? false
+        multiAgentBubbleEnabled = ud.object(forKey: Keys.multiAgentBubbleEnabled) as? Bool ?? true
         hiddenKinds        = Set((Self.loadJSON(Keys.hiddenKinds) as [String]? ?? []).compactMap(AgentKind.init(rawValue:)))
         iconChoices    = Self.loadJSON(Keys.iconChoices) ?? [:]
     }

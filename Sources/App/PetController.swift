@@ -134,8 +134,13 @@ final class PetController: ObservableObject {
     }
 
     private func refreshChat() {
-        guard showChat, mood != .idle else {
+        guard showChat else {
             chatLine = ""
+            StatusBarController.shared.refreshTitle()
+            return
+        }
+        if mood == .idle {
+            chatLine = IdleBoost.line()
             StatusBarController.shared.refreshTitle()
             return
         }

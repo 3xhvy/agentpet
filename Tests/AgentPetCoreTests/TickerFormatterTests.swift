@@ -12,6 +12,7 @@ final class TickerFormatterTests: XCTestCase {
         XCTAssertEqual(TickerFormatter.agentLabel(for: .gemini),   "Gemini")
         XCTAssertEqual(TickerFormatter.agentLabel(for: .opencode), "Opencode")
         XCTAssertEqual(TickerFormatter.agentLabel(for: .windsurf), "Windsurf")
+        XCTAssertEqual(TickerFormatter.agentLabel(for: .antigravity), "Antigravity")
     }
 
     func testAgentLabelFallbacks() {
