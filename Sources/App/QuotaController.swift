@@ -8,6 +8,19 @@ final class QuotaController: ObservableObject {
 
     @Published private(set) var snapshots: [QuotaSnapshot] = []
     @Published private(set) var isRefreshing = false
+    @Published var trackerEnabled: Bool {
+        didSet {
+            UserDefaults.standard.set(trackerEnabled, forKey: Self.trackerEnabledKey)
+            if trackerEnabled {
+                start()
+            } else {
+                refreshTimer?.invalidate()
+                refreshTimer = nil
+                snapshots = []
+                deliveredWarningKeys.removeAll()
+            }
+        }
+    }
     @Published var warningEnabled: Bool {
         didSet {
             UserDefaults.standard.set(warningEnabled, forKey: Self.warningEnabledKey)
@@ -25,16 +38,23 @@ final class QuotaController: ObservableObject {
     private let service = QuotaService()
     private var deliveredWarningKeys: Set<String> = []
 
+    private static let trackerEnabledKey = "agentpet.quotaTracker.enabled"
     private static let warningEnabledKey = "agentpet.quotaWarning.enabled"
     private static let warningThresholdKey = "agentpet.quotaWarning.threshold"
 
     init() {
+        trackerEnabled = (UserDefaults.standard.object(forKey: Self.trackerEnabledKey) as? Bool) ?? false
         warningEnabled = (UserDefaults.standard.object(forKey: Self.warningEnabledKey) as? Bool) ?? true
         warningThreshold = UserDefaults.standard.object(forKey: Self.warningThresholdKey) as? Double ?? 20
     }
 
     func start() {
         refreshTimer?.invalidate()
+        guard trackerEnabled else {
+            refreshTimer = nil
+            snapshots = []
+            return
+        }
         refresh()
         refreshTimer = Timer.scheduledTimer(withTimeInterval: 5 * 60, repeats: true) { _ in
             Task { @MainActor in self.refresh() }
@@ -42,10 +62,20 @@ final class QuotaController: ObservableObject {
     }
 
     func refresh() {
+        guard trackerEnabled else {
+            isRefreshing = false
+            snapshots = []
+            return
+        }
         guard !isRefreshing else { return }
         isRefreshing = true
         Task {
             let result = await service.fetchAll()
+            guard self.trackerEnabled else {
+                snapshots = []
+                isRefreshing = false
+                return
+            }
             snapshots = result
             isRefreshing = false
             handleQuotaWarnings(result)
@@ -53,7 +83,7 @@ final class QuotaController: ObservableObject {
     }
 
     private func handleQuotaWarnings(_ snapshots: [QuotaSnapshot]) {
-        guard warningEnabled else { return }
+        guard trackerEnabled, warningEnabled else { return }
         let events = QuotaWarning.events(in: snapshots, thresholdRemainingPercentage: warningThreshold)
         for event in events {
             let key = warningKey(for: event)

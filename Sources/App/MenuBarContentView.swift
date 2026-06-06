@@ -24,8 +24,10 @@ struct MenuContentView: View {
             header
             divider
             agentSection
-            divider
-            quotaSection
+            if quota.trackerEnabled {
+                divider
+                quotaSection
+            }
             divider
             controls
             divider
@@ -80,9 +82,18 @@ struct MenuContentView: View {
                 }
             }
             if agents.isEmpty {
-                Text("Nothing running right now.")
-                    .font(.system(size: 12)).foregroundStyle(.white.opacity(0.4))
+                TimelineView(.periodic(from: .now, by: 60)) { context in
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("Nothing running right now.")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundStyle(.white.opacity(0.55))
+                        Text(IdleBoost.line(at: context.date))
+                            .font(.system(size: 12))
+                            .foregroundStyle(.white.opacity(0.4))
+                            .lineLimit(2)
+                    }
                     .padding(.horizontal, 14).padding(.bottom, 12)
+                }
             } else {
                 ForEach(agents) { session in
                     AgentRow(session: session, onClear: { daemon.removeSession(session.id) })

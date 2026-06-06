@@ -362,38 +362,58 @@ private struct QuotaTab: View {
 
     var body: some View {
         Form {
-            Section {
-                ForEach(ProviderAuthCatalog.quotaProviders) { provider in
-                    ProviderAuthRow(provider: provider, auth: auth)
-                }
-            } header: {
-                Text("Provider auth")
-            } footer: {
-                Text("Use the provider's own CLI/OAuth login, then import or let AgentPet detect the local auth file. No manual API token paste required.")
-            }
-
-            Section("Quota warnings") {
+            Section("Quota tracker") {
                 HStack {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Warn when quota is low")
-                        Text("The pet shows a warning when any provider quota drops below this remaining percentage.")
+                        Text("Track provider quota")
+                        Text("When enabled, AgentPet can use local provider auth to fetch quota usage.")
                             .font(.caption).foregroundStyle(.secondary)
                     }
                     Spacer()
-                    ColorSwitch(isOn: $quota.warningEnabled)
+                    ColorSwitch(isOn: $quota.trackerEnabled)
                 }
-                HStack {
-                    Slider(value: $quota.warningThreshold, in: 5...50, step: 5)
-                    Text("\(Int(quota.warningThreshold))%")
-                        .monospacedDigit()
-                        .foregroundStyle(.secondary)
-                        .frame(width: 44, alignment: .trailing)
+            }
+
+            if quota.trackerEnabled {
+                Section {
+                    ForEach(ProviderAuthCatalog.quotaProviders) { provider in
+                        ProviderAuthRow(provider: provider, auth: auth)
+                    }
+                } header: {
+                    Text("Provider auth")
+                } footer: {
+                    Text("Use the provider's own CLI/OAuth login, then import or let AgentPet detect the local auth file. No manual API token paste required.")
                 }
-                .disabled(!quota.warningEnabled)
-                .opacity(quota.warningEnabled ? 1 : 0.5)
+
+                Section("Quota warnings") {
+                    HStack {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Warn when quota is low")
+                            Text("The pet shows a warning when any provider quota drops below this remaining percentage.")
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        ColorSwitch(isOn: $quota.warningEnabled)
+                    }
+                    HStack {
+                        Slider(value: $quota.warningThreshold, in: 5...50, step: 5)
+                        Text("\(Int(quota.warningThreshold))%")
+                            .monospacedDigit()
+                            .foregroundStyle(.secondary)
+                            .frame(width: 44, alignment: .trailing)
+                    }
+                    .disabled(!quota.warningEnabled)
+                    .opacity(quota.warningEnabled ? 1 : 0.5)
+                }
             }
         }
         .formStyle(.grouped)
+        .onChange(of: quota.trackerEnabled) { enabled in
+            if enabled {
+                auth.refresh()
+                quota.refresh()
+            }
+        }
     }
 }
 

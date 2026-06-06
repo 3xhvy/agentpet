@@ -17,9 +17,7 @@ final class ProviderAuthController: ObservableObject {
     private let projectPrefix = "agentpet.providerAuth.project."
     private let importedKey = "agentpet.providerAuth.importedKinds"
 
-    init() {
-        refresh()
-    }
+    init() {}
 
     func refresh() {
         localKinds = Set(ProviderAuthCatalog.quotaProviders.compactMap { provider in
