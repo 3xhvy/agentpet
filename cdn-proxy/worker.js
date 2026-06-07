@@ -35,6 +35,11 @@ export default {
 
     if (path === "/manifest" || path === "/api/manifest") return manifest(env);
     if (path === "/mirror/status") return mirrorStatus(env);
+    if (path === "/mirror/publish") {
+      if (env.MIRROR_KEY && url.searchParams.get("key") !== env.MIRROR_KEY)
+        return json({ error: "forbidden" }, 403);
+      return json(await publishManifest(env));
+    }
     if (path === "/mirror/run") {
       if (env.MIRROR_KEY && url.searchParams.get("key") !== env.MIRROR_KEY)
         return json({ error: "forbidden" }, 403);
@@ -48,15 +53,31 @@ export default {
 
 // ---- manifest (built from the R2 catalog snapshot, app/web-compatible shape) ----
 function manifestPets(catPets) {
-  return catPets.map((p) => ({
-    slug: p.folder,
-    displayName: p.displayName || p.folder,
-    spritesheetUrl: `${R2_PUBLIC}/pets/${p.folder}/spritesheet.webp`,
-    petJsonUrl: `${R2_PUBLIC}/pets/${p.folder}/pet.json`,
-    source: p.source,
-    kind: p.kind || "",
-    submittedBy: p.submittedBy || "",
-  }));
+  return catPets.map((p) => {
+    const out = {
+      slug: p.folder,
+      displayName: p.displayName || p.folder,
+      spritesheetUrl: `${R2_PUBLIC}/pets/${p.folder}/spritesheet.webp`,
+      petJsonUrl: `${R2_PUBLIC}/pets/${p.folder}/pet.json`,
+      source: p.source,
+      kind: p.kind || "",
+    };
+    // Only include submittedBy when there's a real author. Omitting it (vs "")
+    // lets the app fall back to "by community" for unattributed pets.
+    if (p.submittedBy) out.submittedBy = p.submittedBy;
+    return out;
+  });
+}
+
+// Rebuild the static manifest.json from the stored catalog (no asset work).
+async function publishManifest(env) {
+  const snap = await env.CACHE.get("_catalog.json");
+  if (!snap) return { ok: false, reason: "no catalog snapshot" };
+  const cat = await snap.json();
+  const pets = manifestPets(cat.pets || []);
+  await env.CACHE.put("manifest.json", JSON.stringify({ pets }),
+    { httpMetadata: { contentType: "application/json", cacheControl: "public, max-age=300" } });
+  return { ok: true, total: pets.length };
 }
 
 async function manifest(env) {

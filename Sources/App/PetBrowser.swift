@@ -18,7 +18,7 @@ struct RemotePet: Decodable, Identifiable {
 
     var id: String { slug }
     var name: String { displayName ?? slug }
-    var author: String { submittedBy ?? "community" }
+    var author: String { let s = (submittedBy ?? "").trimmingCharacters(in: .whitespaces); return s.isEmpty ? "community" : s }
 }
 
 /// Decodes `T` but tolerates a malformed element (yields `nil` instead of
