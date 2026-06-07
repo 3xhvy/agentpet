@@ -9,7 +9,8 @@ final class StateMapperTests: XCTestCase {
         XCTAssertEqual(StateMapper.state(for: .claude, eventName: "PostToolUse"), .working)
         XCTAssertEqual(StateMapper.state(for: .claude, eventName: "Notification"), .waiting)
         XCTAssertEqual(StateMapper.state(for: .claude, eventName: "Stop"), .done)
-        XCTAssertEqual(StateMapper.state(for: .claude, eventName: "SubagentStop"), .done)
+        XCTAssertNil(StateMapper.state(for: .claude, eventName: "SubagentStop"),
+                     "a subagent finishing mid-task must not change the main session's state")
     }
 
     func testUnknownEventIsIgnored() {
@@ -38,10 +39,16 @@ final class StateMapperTests: XCTestCase {
     }
 
     func testHookSpecsCoverInstallEvents() {
-        // Every event we register must either map to a state or end the session.
+        // Every event we register must either map to a state, end the session,
+        // or be an intentionally-ignored event (documented here).
+        let intentionallyIgnored: [AgentKind: Set<String>] = [
+            .claude: ["SubagentStop"]
+        ]
         for kind in [AgentKind.claude, .codex, .gemini] {
             let spec = AgentHooks.spec(for: kind)!
-            for event in spec.events where !StateMapper.isSessionEnd(for: kind, eventName: event) {
+            let ignored = intentionallyIgnored[kind] ?? []
+            for event in spec.events
+            where !StateMapper.isSessionEnd(for: kind, eventName: event) && !ignored.contains(event) {
                 XCTAssertNotNil(StateMapper.state(for: kind, eventName: event), "\(kind) \(event)")
             }
         }
