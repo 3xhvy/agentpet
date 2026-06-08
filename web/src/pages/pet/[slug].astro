@@ -136,7 +136,7 @@ const axisLabels = AXES.map((a) => ({ ...a, p: rpt(a.ang, RADAR.r + 18) }));
               <span class="inline-flex items-center gap-1.5 rounded-full bg-brand-50 px-3 py-1 font-pixel text-[11px] text-brand-700"><Icon name="bolt" class="h-3.5 w-3.5" /> <span id="actionFrames">…</span></span>
             </div>
             <div class="mt-2 font-display text-2xl font-bold text-ink" id="actionName">Idle</div>
-            <div class="mt-3 grid place-items-center rounded-2xl border border-line sprite-checker p-4">
+            <div class="mt-3 grid place-items-center rounded-2xl border border-line sprite-checker ap-skel p-4">
               <canvas id="actionCanvas" class="h-60 w-full" width="320" height="300"></canvas>
             </div>
             <p class="mt-3 text-sm text-muted" id="actionCaption">…</p>
@@ -316,7 +316,7 @@ const axisLabels = AXES.map((a) => ({ ...a, p: rpt(a.ang, RADAR.r + 18) }));
         aCur = i; aFrame = 0;
         if (aTimer) { clearInterval(aTimer); aTimer = null; }
         const fr = rows[i]; if (!fr) return;
-        aDraw();
+        aDraw(); actionCanvas.parentElement?.classList.remove("ap-skel");
         if (fr.length > 1) aTimer = window.setInterval(() => { aFrame = (aFrame + 1) % fr.length; aDraw(); }, 150);
         setText("actionName", nameOfState(i));
         setText("actionFrames", fr.length + (fr.length === 1 ? " frame" : " frames"));
@@ -346,14 +346,14 @@ const axisLabels = AXES.map((a) => ({ ...a, p: rpt(a.ang, RADAR.r + 18) }));
               <div class="font-display text-base font-semibold text-ink">${nameOfState(i)}</div>
               <div class="mt-0.5 font-pixel text-[11px] tracking-wide text-faint">Row ${i} · ${frames.length} ${frames.length === 1 ? "frame" : "frames"}</div>
             </div>
-            <div class="grid h-16 w-16 shrink-0 place-items-center rounded-xl border border-line sprite-checker">
+            <div class="grid h-16 w-16 shrink-0 place-items-center rounded-xl border border-line sprite-checker ap-skel">
               <canvas width="120" height="120" class="h-full w-full"></canvas>
             </div>`;
           card.addEventListener("click", () => playAction(i));
           sg.appendChild(card);
           const tc = card.querySelector("canvas") as HTMLCanvasElement;
           const tctx = tc.getContext("2d")!; tctx.imageSmoothingEnabled = false;
-          let ti = 0; drawFrame(tctx, tc, img, frames[0], 0.82);
+          let ti = 0; drawFrame(tctx, tc, img, frames[0], 0.82); tc.parentElement?.classList.remove("ap-skel");
           if (frames.length > 1) window.setInterval(() => { ti = (ti + 1) % frames.length; drawFrame(tctx, tc, img, frames[ti], 0.82); }, 150);
         });
         // start engines
@@ -421,7 +421,7 @@ const axisLabels = AXES.map((a) => ({ ...a, p: rpt(a.ang, RADAR.r + 18) }));
       const dr = (f: Frame) => { ctx.clearRect(0, 0, cv.width, cv.height); const s = Math.min(cv.width / f.w, cv.height / f.h) * 0.72, dw = f.w * s, dh = f.h * s; ctx.drawImage(im, f.x, f.y, f.w, f.h, (cv.width - dw) / 2, (cv.height - dh) / 2, dw, dh); };
       const pl = () => { if (tm || fr.length < 2) return; tm = window.setInterval(() => { i = (i + 1) % fr.length; dr(fr[i]); }, 150); };
       const sp = () => { if (tm) { clearInterval(tm); tm = null; } i = 0; if (fr[0]) dr(fr[0]); };
-      im.onload = () => { const r = sliceRows(im); if (!r || !r.length) return; fr = r.flat(); dr(fr[0]); };
+      im.onload = () => { const r = sliceRows(im); if (!r || !r.length) return; fr = r.flat(); dr(fr[0]); cv.parentElement?.classList.remove("ap-skel"); };
       im.src = cv.dataset.sheet!;
       const host = cv.closest("a")!; host.addEventListener("mouseenter", pl); host.addEventListener("mouseleave", sp);
     }
@@ -430,6 +430,8 @@ const axisLabels = AXES.map((a) => ({ ...a, p: rpt(a.ang, RADAR.r + 18) }));
       const curSlug = simWrap.dataset.slug!, curKind = simWrap.dataset.kind;
       const cols = (simWrap.dataset.collections || "").split(",").filter(Boolean);
       const escS = (s: string) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
+      const sg0 = document.getElementById("similarGrid");
+      if (sg0) sg0.innerHTML = Array.from({ length: 5 }, () => `<div class="card overflow-hidden p-0"><div class="m-2 aspect-square rounded-2xl ap-skel"></div><div class="px-3 py-2"><div class="mx-auto h-3 w-2/3 rounded ap-skel"></div></div></div>`).join("");
       (async () => {
         const pj: any = await fetch("/api/pets.json").then((r) => r.json()).catch(() => ({ pets: [] }));
         const nameOf: Record<string, string> = {};
@@ -449,7 +451,7 @@ const axisLabels = AXES.map((a) => ({ ...a, p: rpt(a.ang, RADAR.r + 18) }));
         const hEl = simWrap.querySelector("h2"); if (hEl) hEl.textContent = heading;
         g.innerHTML = candidates.map((s) => `
           <a href="/pet/${escS(s)}" class="card group flex flex-col overflow-hidden p-0 transition hover:-translate-y-1">
-            <div class="m-2 mb-0 grid aspect-square place-items-center rounded-2xl border border-line sprite-checker p-2"><canvas class="sim-thumb h-full w-full" width="150" height="150" data-sheet="/api/sprite/${escS(s)}"></canvas></div>
+            <div class="m-2 mb-0 grid aspect-square place-items-center rounded-2xl border border-line sprite-checker ap-skel p-2"><canvas class="sim-thumb h-full w-full" width="150" height="150" data-sheet="/api/sprite/${escS(s)}"></canvas></div>
             <div class="truncate px-3 py-2 text-center font-display text-sm font-semibold text-ink">${escS(nameOf[s] || s)}</div>
           </a>`).join("");
         g.querySelectorAll<HTMLCanvasElement>(".sim-thumb").forEach(setupSimThumb);
