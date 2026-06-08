@@ -205,7 +205,12 @@ const bubblePos = [
           <canvas id="spotCanvas" class="thumb h-52 w-48" width="200" height="240" data-sheet={`/api/sprite/${spotlight.slug}`}></canvas>
         </div>
         <div class="p-7 md:p-9">
-          <h3 id="spotName" class="font-display text-3xl font-bold text-ink">{spotlight.name}</h3>
+          <div class="flex items-center gap-2 font-pixel text-[11px] tracking-wide text-faint">
+            <span id="spotNo">NO. {spotlight.no ? String(spotlight.no).padStart(5, "0") : "—"}</span>
+            <span>·</span>
+            <span id="spotKind" class="uppercase">{spotlight.kind}</span>
+          </div>
+          <h3 id="spotName" class="mt-1 font-display text-3xl font-bold text-ink">{spotlight.name}</h3>
           <div class="mt-1 flex items-center gap-2 text-sm text-faint">
             <span class="grid h-6 w-6 place-items-center rounded-full bg-brand-100 text-brand-700"><Icon name="paw" class="h-3.5 w-3.5" /></span>
             by {spotlight.author}
@@ -414,6 +419,8 @@ const bubblePos = [
         const d: any = await (await fetch("/api/random-pet.json")).json();
         if (d && d.slug) {
           setText("spotName", d.name);
+          setText("spotNo", d.num ? "NO. " + String(d.num).padStart(5, "0") : "NO. —");
+          setText("spotKind", String(d.kind || "").toUpperCase());
           setText("spotDesc", d.desc || "A delightful community pixel companion, ready to live on your desktop.");
           const sl = document.getElementById("spotLikes");
           if (sl) { sl.setAttribute("data-slug", d.slug); sl.textContent = "0"; }

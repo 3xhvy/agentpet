@@ -1,6 +1,6 @@
 import type { APIRoute } from "astro";
 import { loadManifest, applyOverrides, petsBase } from "../../lib/pets";
-import { getDB, ensureSchema, getOverrides } from "../../lib/db";
+import { getDB, ensureSchema, getOverrides, getNumber } from "../../lib/db";
 
 export const prerender = false;
 
@@ -18,7 +18,8 @@ export const GET: APIRoute = async () => {
   const p = pets[Math.floor(Math.random() * pets.length)];
   let desc = "";
   try { const j: any = await (await fetch(`${petsBase()}/pets/${p.slug}/pet.json`)).json(); desc = (j.description ?? "").toString(); } catch {}
-  return new Response(JSON.stringify({ slug: p.slug, name: p.name, kind: p.kind, desc }), {
+  const num = db ? await getNumber(db, p.slug) : null;
+  return new Response(JSON.stringify({ slug: p.slug, name: p.name, kind: p.kind, num, desc }), {
     headers: { "content-type": "application/json", "cache-control": "no-store" },
   });
 };
