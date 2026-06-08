@@ -21,7 +21,12 @@ if (!col) return Astro.redirect("/collections");
       {col.description && <p class="mt-2 max-w-2xl text-muted">{col.description}</p>}
       <div class="mt-1 text-sm text-faint"><span id="count">…</span></div>
 
-      <div id="grid" class="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4"></div>
+      <label class="relative mt-5 flex max-w-md items-center">
+        <Icon name="search" class="pointer-events-none absolute left-4 h-5 w-5 text-faint" />
+        <input id="cq" type="search" placeholder="Search in this collection…" class="w-full rounded-full border border-line bg-white py-2.5 pl-12 pr-4 text-ink outline-none focus:border-brand-300" />
+      </label>
+
+      <div id="grid" class="mt-5 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4"></div>
       <div id="empty" class="hidden py-16 text-center text-muted">This collection is empty.</div>
     </div>
   </section>
@@ -64,11 +69,9 @@ if (!col) return Astro.redirect("/collections");
         fetch("/api/pets.json").then((r) => r.json()).catch(() => ({ pets: [] })),
       ]);
       const names = {}; for (const p of pj.pets || []) names[p.slug] = p.name;
-      const slugs = (col.slugs || []).filter((s) => names[s] !== undefined || true);
+      const allSlugs = (col.slugs || []);
       const grid = document.getElementById("grid");
-      document.getElementById("count").textContent = `${slugs.length} pet${slugs.length === 1 ? "" : "s"}`;
-      document.getElementById("empty").classList.toggle("hidden", slugs.length > 0);
-      grid.innerHTML = slugs.map((s) => `
+      const card = (s) => `
         <a href="/pet/${esc(s)}" class="card group flex flex-col overflow-hidden p-0 transition hover:-translate-y-1">
           <div class="grid aspect-[4/5] place-items-center rounded-2xl border border-line sprite-checker m-3 mb-0 p-3">
             <canvas class="h-full w-full" width="180" height="220" data-sheet="/api/sprite/${esc(s)}"></canvas>
@@ -79,9 +82,17 @@ if (!col) return Astro.redirect("/collections");
               <span class="inline-flex items-center gap-1">${heart}<span data-like-count data-slug="${esc(s)}">0</span></span>
             </div>
           </div>
-        </a>`).join("");
-      grid.querySelectorAll("canvas[data-sheet]").forEach((cv) => io.observe(cv));
-      window.apRefreshLikes?.();
+        </a>`;
+      function render(list) {
+        document.getElementById("count").textContent = `${list.length} pet${list.length === 1 ? "" : "s"}`;
+        document.getElementById("empty").classList.toggle("hidden", list.length > 0);
+        grid.innerHTML = list.map(card).join("");
+        grid.querySelectorAll("canvas[data-sheet]").forEach((cv) => io.observe(cv));
+        window.apRefreshLikes?.();
+      }
+      render(allSlugs);
+      let t; const cq = document.getElementById("cq");
+      cq.addEventListener("input", () => { clearTimeout(t); t = setTimeout(() => { const q = cq.value.trim().toLowerCase(); render(!q ? allSlugs : allSlugs.filter((s) => (names[s] || s).toLowerCase().includes(q))); }, 150); });
     })();
   </script>
 </Base>
