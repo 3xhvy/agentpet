@@ -276,13 +276,15 @@ const bubblePos = [
   <!-- FIND YOUR MATCH (sky-island themed facet browser) -->
   <section class="px-4 pt-16">
     <div class="mx-auto max-w-6xl">
-      <div class="relative overflow-hidden rounded-[2rem] border border-line bg-gradient-to-b from-brand-100 via-brand-50 to-white px-6 py-10 shadow-card sm:px-10">
-        <!-- drifting clouds + floating cartoon mascots -->
+      <div class="relative">
+        <!-- floating cartoon mascots (outside the panel so they aren't clipped) -->
+        <img src="/island/isl-snorlax.png" alt="" class="bob pixel-art pointer-events-none absolute -right-5 -top-8 z-20 hidden w-24 md:block" style="animation-delay:-1.2s" />
+        <img src="/island/isl-cherry.png" alt="" class="bob-2 pixel-art pointer-events-none absolute -left-5 -bottom-7 z-20 hidden w-24 md:block" style="animation-delay:-2.4s" />
+        <div class="relative overflow-hidden rounded-[2rem] border border-line bg-gradient-to-b from-brand-100 via-brand-50 to-white px-6 py-10 shadow-card sm:px-10">
+        <!-- drifting clouds (clipped to the panel) -->
         <img src="/island/cloud3.png" alt="" class="pixel-art pointer-events-none absolute left-0 top-8 w-40 opacity-70" style="animation: drift 90s linear infinite" />
         <img src="/island/cloud5.png" alt="" class="pixel-art pointer-events-none absolute right-0 top-28 w-48 opacity-60" style="animation: drift 120s linear infinite -40s" />
         <img src="/island/cloud2.png" alt="" class="pixel-art pointer-events-none absolute bottom-6 left-1/4 w-32 opacity-50" style="animation: drift 150s linear infinite -80s" />
-        <img src="/island/isl-snorlax.png" alt="" class="bob pixel-art pointer-events-none absolute -right-3 -top-2 hidden w-24 md:block" style="animation-delay:-1.2s" />
-        <img src="/island/isl-cherry.png" alt="" class="bob-2 pixel-art pointer-events-none absolute -left-3 bottom-1 hidden w-24 md:block" style="animation-delay:-2.4s" />
 
         <div class="relative z-10 text-center">
           <div class="font-pixel text-[11px] uppercase tracking-wide text-brand-500">Pick a vibe</div>
@@ -307,6 +309,7 @@ const bubblePos = [
               ))}
             </div>
           </div>
+        </div>
         </div>
       </div>
     </div>
