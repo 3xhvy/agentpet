@@ -232,6 +232,37 @@ const bubblePos = [
   </section>
   )}
 
+  <!-- BROWSE BY COLLECTION (quick preview, composite scenes) -->
+  {collectionPreview.length > 0 && (
+  <section class="px-4 pt-16">
+    <div class="mx-auto max-w-6xl">
+      <div class="flex items-end justify-between">
+        <div>
+          <h2 class="font-display text-3xl font-bold text-ink">Browse by collection</h2>
+          <p class="mt-1 text-muted">Curated shelves of companions, hand-grouped by theme.</p>
+        </div>
+        <a href="/collections" class="hidden items-center gap-1 font-semibold text-brand-600 hover:text-brand-700 sm:flex">See all <Icon name="arrow" class="h-4 w-4" /></a>
+      </div>
+      <div class="mt-6 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+        {collectionPreview.map((c) => (
+          <a href={`/collections/${c.slug}`} class="card group overflow-hidden p-0 transition hover:-translate-y-1">
+            <div class="aspect-[16/9] w-full overflow-hidden border-b border-line">
+              <canvas class="collection-thumb h-full w-full" width="384" height="216" data-slugs={c.samples.join(",")}></canvas>
+            </div>
+            <div class="flex items-center justify-between gap-2 p-5">
+              <div>
+                <h3 class="font-display text-lg font-bold text-ink">{c.title}</h3>
+                <p class="text-sm text-muted">{c.count} pet{c.count === 1 ? "" : "s"}</p>
+              </div>
+              <span class="inline-flex items-center gap-1 text-sm font-semibold text-brand-600">Open <Icon name="arrow" class="h-4 w-4 transition group-hover:translate-x-1" /></span>
+            </div>
+          </a>
+        ))}
+      </div>
+    </div>
+  </section>
+  )}
+
   <!-- BROWSE BY CATEGORY -->
   <section class="px-4 pt-16">
     <div class="mx-auto max-w-6xl">
@@ -272,39 +303,6 @@ const bubblePos = [
       </a>
     </div>
   </section>
-
-  <!-- BROWSE BY COLLECTION (quick preview) -->
-  {collectionPreview.length > 0 && (
-  <section class="px-4 pt-16">
-    <div class="mx-auto max-w-6xl">
-      <div class="flex items-end justify-between">
-        <div>
-          <h2 class="font-display text-3xl font-bold text-ink">Browse by collection</h2>
-          <p class="mt-1 text-muted">Curated shelves of companions, hand-grouped by theme.</p>
-        </div>
-        <a href="/collections" class="hidden items-center gap-1 font-semibold text-brand-600 hover:text-brand-700 sm:flex">See all <Icon name="arrow" class="h-4 w-4" /></a>
-      </div>
-      <div class="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {collectionPreview.map((c) => (
-          <a href={`/collections/${c.slug}`} class="card group flex flex-col p-5 transition hover:-translate-y-1">
-            <div class="flex items-center justify-between gap-2">
-              <h3 class="font-display text-lg font-bold text-ink">{c.title}</h3>
-              <span class="shrink-0 rounded-full bg-brand-50 px-2.5 py-0.5 font-pixel text-[10px] tracking-wide text-brand-700">{c.count}</span>
-            </div>
-            <div class="mt-3 flex gap-2">
-              {c.samples.slice(0, 4).map((s: string) => (
-                <span class="grid h-14 w-14 place-items-center rounded-xl border border-line sprite-checker">
-                  <canvas class="thumb h-11 w-11" width="96" height="96" data-autoplay data-sheet={`/api/sprite/${s}`}></canvas>
-                </span>
-              ))}
-            </div>
-            <span class="mt-4 inline-flex items-center gap-1 text-sm font-semibold text-brand-600">Open <Icon name="arrow" class="h-4 w-4 transition group-hover:translate-x-1" /></span>
-          </a>
-        ))}
-      </div>
-    </div>
-  </section>
-  )}
 
   <!-- WORLD SHOWCASE -->
   <section class="relative px-4 pt-20">
@@ -382,6 +380,9 @@ const bubblePos = [
   </section>
 
   <script>
+    import { drawComposite } from "../lib/composite";
+    document.querySelectorAll<HTMLCanvasElement>(".collection-thumb[data-slugs]").forEach((cv) => drawComposite(cv, (cv.dataset.slugs || "").split(",").filter(Boolean)));
+
     // Slice a spritesheet (alpha gutters) into rows=animations, play one row on a
     // canvas. Spotlight ([data-autoplay]) loops automatically; cards play on hover.
     // Same-origin (/api/sprite) so getImageData isn't blocked.
