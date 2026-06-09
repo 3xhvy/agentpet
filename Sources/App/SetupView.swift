@@ -8,15 +8,41 @@ struct SetupView: View {
     @ObservedObject private var pet = PetController.shared
     @ObservedObject private var imagePets = ImagePetStore.shared
     var onClose: () -> Void
+    /// Asks the window to resize to a target content width so the live-preview
+    /// panel can slide in on the right. Provided by SettingsWindowController.
+    var onResize: (CGFloat) -> Void = { _ in }
 
     enum Tab { case general, pet, bubble, about }
     @State private var tab: Tab = .general
+    @State private var demoOpen = false
+
+    private let baseWidth: CGFloat = 640
+    private let demoWidth: CGFloat = 740
 
     private var selectedPack: ImagePetPack? {
         pet.selectedPetID.flatMap { imagePets.pack(id: $0) }
     }
 
+    private func setDemo(_ open: Bool) {
+        demoOpen = open
+        onResize(open ? baseWidth + demoWidth : baseWidth)
+    }
+
     var body: some View {
+        HStack(spacing: 0) {
+            settingsColumn.frame(width: baseWidth)
+            if demoOpen {
+                Divider()
+                SettingsDemoPanel(onClose: { setDemo(false) }).frame(width: demoWidth)
+            }
+        }
+        .frame(width: demoOpen ? baseWidth + demoWidth : baseWidth, height: 600)
+        .preferredColorScheme(.dark)
+        .noFocusRing()
+        .onAppear { model.refresh() }
+    }
+
+    private var settingsColumn: some View {
         VStack(spacing: 0) {
             tabBar
             Divider()
@@ -32,11 +58,24 @@ struct SetupView: View {
                     AboutTab()
                 }
             }
+            .frame(maxHeight: .infinity)
+            Divider()
+            bottomBar
         }
-        .frame(width: 640, height: 600)
-        .preferredColorScheme(.dark)
-        .noFocusRing()
-        .onAppear { model.refresh() }
+    }
+
+    private var bottomBar: some View {
+        HStack(spacing: 10) {
+            Button { setDemo(!demoOpen) } label: {
+                Label(demoOpen ? "Hide live preview" : "Live preview", systemImage: "sparkles.tv")
+            }
+            .buttonStyle(.borderedProminent).tint(Color.systemAccent).controlSize(.large)
+            Text("Fire webhooks for many agents with your current settings")
+                .font(.caption).foregroundStyle(.secondary).lineLimit(1)
+            Spacer()
+        }
+        .padding(.horizontal, 16).padding(.vertical, 10)
+        .background(.bar)
     }
 
     private var tabBar: some View {

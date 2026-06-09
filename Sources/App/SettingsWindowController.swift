@@ -20,13 +20,14 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
         // Show a Dock icon while Settings is open (requires .regular policy).
         NSApp.setActivationPolicy(.regular)
 
-        let host = NSHostingView(rootView: SetupView(onClose: { [weak self] in
-            self?.window?.close()
-        }))
+        let host = NSHostingView(rootView: SetupView(
+            onClose: { [weak self] in self?.window?.close() },
+            onResize: { [weak self] width in self?.resize(toContentWidth: width) }
+        ))
         // A normal window (not NSPanel) so SwiftUI text fields reliably receive
         // keyboard input. Settings intentionally takes focus (shows a Dock icon).
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 560, height: 600),
+            contentRect: NSRect(x: 0, y: 0, width: 640, height: 600),
             styleMask: [.titled, .closable],
             backing: .buffered, defer: false
         )
@@ -43,6 +44,17 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
             NSApp.activate(ignoringOtherApps: true)
             window.makeKeyAndOrderFront(nil)
         }
+    }
+
+    /// Animates the Settings window to a target content width, keeping the
+    /// top-left corner fixed so the live-preview panel slides out to the right.
+    private func resize(toContentWidth target: CGFloat) {
+        guard let window else { return }
+        let curContent = window.contentRect(forFrameRect: window.frame).width
+        guard abs(curContent - target) > 0.5 else { return }
+        var f = window.frame
+        f.size.width += (target - curContent)   // origin unchanged -> top-left stays put
+        window.setFrame(f, display: true, animate: true)
     }
 
     func windowWillClose(_ notification: Notification) {
