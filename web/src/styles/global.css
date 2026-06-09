@@ -50,6 +50,19 @@
   }
   h1, h2, h3, h4 { color: var(--color-ink); font-family: var(--font-display); font-weight: 600; }
   a { color: inherit; }
+
+  /* Vietnamese & Chinese: the rounded display/pixel fonts (Fredoka, Pixelify)
+     don't ship those glyphs, so diacritics/CJK break. Fall back to a
+     script-safe family when the page switches language. */
+  html[lang="vi"] {
+    --font-display: var(--font-sans);
+    --font-pixel: var(--font-sans);
+  }
+  html[lang="zh-Hans"] {
+    --font-sans: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+    --font-display: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", sans-serif;
+    --font-pixel: "PingFang SC", "Microsoft YaHei", sans-serif;
+  }
 }
 
 @layer components {

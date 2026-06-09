@@ -246,6 +246,8 @@ export const DICT: Record<"vi" | "zh", Record<string, string>> = {
     "Connect your tools from Settings with one tap, hooks are written for you and removed cleanly when you uninstall.": "Kết nối công cụ từ Settings chỉ bằng một chạm, hook được viết sẵn cho bạn và gỡ sạch khi bạn uninstall.",
     "to monitor any CLI agent.": "để theo dõi bất kỳ agent CLI nào.",
     "AgentPet is open source (MIT). Pet artwork stays the property of its creators. Want to add a pet or improve the app?": "AgentPet là mã nguồn mở (MIT). Artwork của pet vẫn thuộc về người tạo. Muốn thêm pet hoặc cải thiện app?",
+    "More": "Thêm",
+    "Scroll to top": "Lên đầu trang",
   },
   zh: {
     "Gallery": "图库", "Collections": "合集", "Leaderboard": "排行榜",
@@ -484,5 +486,7 @@ export const DICT: Record<"vi" | "zh", Record<string, string>> = {
     "Connect your tools from Settings with one tap, hooks are written for you and removed cleanly when you uninstall.": "在设置中一键连接你的工具，hooks 会自动写入，卸载时也会被干净移除。",
     "to monitor any CLI agent.": "来监控任意 CLI Agent。",
     "AgentPet is open source (MIT). Pet artwork stays the property of its creators. Want to add a pet or improve the app?": "AgentPet 是开源的（MIT）。宠物美术作品归其创作者所有。想添加宠物或改进应用？",
+    "More": "更多",
+    "Scroll to top": "回到顶部",
   },
 };
