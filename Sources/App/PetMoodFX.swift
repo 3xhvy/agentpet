@@ -8,22 +8,10 @@ struct PetMotion {
     var scaleX: CGFloat
     var scaleY: CGFloat
 
+    /// Identity: the app no longer adds body motion (no bob/sway/rotation/scale).
+    /// The pet stays perfectly still and only animates through its sprite frames.
     static func resolve(_ mood: PetMood, _ t: Double) -> PetMotion {
-        switch mood {
-        case .working:
-            return PetMotion(offsetY: -abs(sin(t * 6)) * 5, rotation: sin(t * 12) * 2, scaleX: 1, scaleY: 1)
-        case .waiting:
-            return PetMotion(offsetY: sin(t * 2.6) * 1.5, rotation: sin(t * 2.6) * 7, scaleX: 1, scaleY: 1)
-        case .celebrate:
-            let hop = abs(sin(t * 4))
-            return PetMotion(offsetY: -hop * 11, rotation: sin(t * 8) * 5,
-                             scaleX: 1 + 0.05 * (1 - hop), scaleY: 1 - 0.05 * (1 - hop))
-        case .done:
-            return PetMotion(offsetY: sin(t * 2) * 2.5, rotation: 0, scaleX: 1, scaleY: 1)
-        case .idle:
-            let b = sin(t * 1.7)
-            return PetMotion(offsetY: b * 2, rotation: 0, scaleX: 1 + 0.02 * b, scaleY: 1 - 0.02 * b)
-        }
+        PetMotion(offsetY: 0, rotation: 0, scaleX: 1, scaleY: 1)
     }
 }
 
