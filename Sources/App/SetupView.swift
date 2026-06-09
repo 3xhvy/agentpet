@@ -186,7 +186,7 @@ private struct AboutTab: View {
 }
 
 private struct SoundRow: View {
-    let title: String
+    let title: LocalizedStringKey
     @Binding var enabled: Bool
     let customPath: String
     let onPlay: () -> Void
@@ -323,20 +323,20 @@ private struct GeneralTab: View {
     private var notificationTitle: String {
         switch model.notificationState {
         case .enabled: return model.notificationsEnabled ? "Notifications on" : "Notifications muted"
-        case .denied: return "Notifications denied"
-        case .unavailable: return "Notifications unavailable"
-        case .notDetermined: return "Enable notifications"
+        case .denied: return NSLocalizedString("Notifications denied", comment: "")
+        case .unavailable: return NSLocalizedString("Notifications unavailable", comment: "")
+        case .notDetermined: return NSLocalizedString("Enable notifications", comment: "")
         }
     }
 
     private var notificationDetail: String {
         switch model.notificationState {
-        case .unavailable: return "Available once installed as AgentPet.app"
-        case .denied: return "Turn on in System Settings to get alerts"
+        case .unavailable: return NSLocalizedString("Available once installed as AgentPet.app", comment: "")
+        case .denied: return NSLocalizedString("Turn on in System Settings to get alerts", comment: "")
         case .enabled: return model.notificationsEnabled
             ? "Alerts when an agent finishes or needs input"
             : "Muted, the toggle turns alerts back on"
-        case .notDetermined: return "Alerts when an agent finishes or needs input"
+        case .notDetermined: return NSLocalizedString("Alerts when an agent finishes or needs input", comment: "")
         }
     }
 

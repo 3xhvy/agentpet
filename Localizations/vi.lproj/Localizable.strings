@@ -132,3 +132,34 @@
 "Wizard" = "Phù thủy";
 "Explorer" = "Nhà thám hiểm";
 "Scientist" = "Nhà khoa học";
+
+/* Demo panel, notifications, sounds, footers */
+"Live preview" = "Xem trực tiếp";
+"Hide live preview" = "Ẩn xem trực tiếp";
+"Fire webhooks for many agents with your current settings" = "Bắn webhook cho nhiều agent với cài đặt hiện tại";
+"Add webhook" = "Thêm webhook";
+"Add" = "Thêm";
+"Quick scenarios" = "Kịch bản nhanh";
+"Spawn 3 working" = "Tạo 3 đang làm";
+"Finish all" = "Hoàn tất tất cả";
+"Clear all" = "Xóa tất cả";
+"Active webhooks" = "Webhook đang hoạt động";
+"No webhooks yet. Add one from the right →" = "Chưa có webhook. Thêm từ bên phải →";
+"Preview mood" = "Xem thử trạng thái";
+"Shows your Simple-bubble message for each state." = "Hiện câu Simple-bubble của bạn cho từng trạng thái.";
+"Add agents here, then change each webhook's state or delete it in the list on the left." = "Thêm agent ở đây, rồi đổi trạng thái hoặc xóa từng webhook ở danh sách bên trái.";
+"Turn on Multi-agent bubble to add agents here. In Simple mode, use the Preview mood buttons on the left." = "Bật Bong bóng đa agent để thêm agent ở đây. Ở chế độ Simple, dùng nút Preview mood bên trái.";
+"Webhooks are for the multi-agent bubble." = "Webhook dành cho bong bóng đa agent.";
+"Notifications on" = "Thông báo đang bật";
+"Notifications muted" = "Thông báo đang tắt tiếng";
+"Notifications denied" = "Thông báo bị từ chối";
+"Notifications unavailable" = "Thông báo không khả dụng";
+"Enable notifications" = "Bật thông báo";
+"Available once installed as AgentPet.app" = "Khả dụng sau khi cài dưới dạng AgentPet.app";
+"Turn on in System Settings to get alerts" = "Bật trong Cài đặt hệ thống để nhận thông báo";
+"Alerts when an agent finishes or needs input" = "Báo khi agent xong hoặc cần nhập";
+"Muted, the toggle turns alerts back on" = "Đang tắt tiếng, gạt công tắc để bật lại";
+"When an agent finishes" = "Khi một agent hoàn tất";
+"When an agent needs input" = "Khi một agent cần nhập";
+"Per-agent overrides win over \"All agents\". A custom line replaces the live/theme text and the real pet honours it." = "Câu riêng từng agent ưu tiên hơn \"Tất cả agent\". Câu tùy chỉnh thay cho text live/theme và pet thật cũng áp dụng.";
+"Whimsical phrases shown while agents work, e.g. \"Brewing…\" or \"Compiling…\"." = "Câu vui hiện khi agent làm việc, ví dụ \"Brewing…\" hoặc \"Compiling…\".";

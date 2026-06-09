@@ -132,3 +132,34 @@
 "Wizard" = "Wizard";
 "Explorer" = "Explorer";
 "Scientist" = "Scientist";
+
+/* Demo panel, notifications, sounds, footers */
+"Live preview" = "Live preview";
+"Hide live preview" = "Hide live preview";
+"Fire webhooks for many agents with your current settings" = "Fire webhooks for many agents with your current settings";
+"Add webhook" = "Add webhook";
+"Add" = "Add";
+"Quick scenarios" = "Quick scenarios";
+"Spawn 3 working" = "Spawn 3 working";
+"Finish all" = "Finish all";
+"Clear all" = "Clear all";
+"Active webhooks" = "Active webhooks";
+"No webhooks yet. Add one from the right →" = "No webhooks yet. Add one from the right →";
+"Preview mood" = "Preview mood";
+"Shows your Simple-bubble message for each state." = "Shows your Simple-bubble message for each state.";
+"Add agents here, then change each webhook's state or delete it in the list on the left." = "Add agents here, then change each webhook's state or delete it in the list on the left.";
+"Turn on Multi-agent bubble to add agents here. In Simple mode, use the Preview mood buttons on the left." = "Turn on Multi-agent bubble to add agents here. In Simple mode, use the Preview mood buttons on the left.";
+"Webhooks are for the multi-agent bubble." = "Webhooks are for the multi-agent bubble.";
+"Notifications on" = "Notifications on";
+"Notifications muted" = "Notifications muted";
+"Notifications denied" = "Notifications denied";
+"Notifications unavailable" = "Notifications unavailable";
+"Enable notifications" = "Enable notifications";
+"Available once installed as AgentPet.app" = "Available once installed as AgentPet.app";
+"Turn on in System Settings to get alerts" = "Turn on in System Settings to get alerts";
+"Alerts when an agent finishes or needs input" = "Alerts when an agent finishes or needs input";
+"Muted, the toggle turns alerts back on" = "Muted, the toggle turns alerts back on";
+"When an agent finishes" = "When an agent finishes";
+"When an agent needs input" = "When an agent needs input";
+"Per-agent overrides win over \"All agents\". A custom line replaces the live/theme text and the real pet honours it." = "Per-agent overrides win over \"All agents\". A custom line replaces the live/theme text and the real pet honours it.";
+"Whimsical phrases shown while agents work, e.g. \"Brewing…\" or \"Compiling…\"." = "Whimsical phrases shown while agents work, e.g. \"Brewing…\" or \"Compiling…\".";

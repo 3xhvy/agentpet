@@ -132,3 +132,34 @@
 "Wizard" = "巫师";
 "Explorer" = "探险家";
 "Scientist" = "科学家";
+
+/* Demo panel, notifications, sounds, footers */
+"Live preview" = "实时预览";
+"Hide live preview" = "隐藏实时预览";
+"Fire webhooks for many agents with your current settings" = "用当前设置为多个 Agent 触发 webhook";
+"Add webhook" = "添加 Webhook";
+"Add" = "添加";
+"Quick scenarios" = "快捷场景";
+"Spawn 3 working" = "生成 3 个工作中";
+"Finish all" = "全部完成";
+"Clear all" = "清除全部";
+"Active webhooks" = "活动 Webhook";
+"No webhooks yet. Add one from the right →" = "还没有 Webhook。从右侧添加 →";
+"Preview mood" = "预览状态";
+"Shows your Simple-bubble message for each state." = "显示每个状态下你的简单气泡消息。";
+"Add agents here, then change each webhook's state or delete it in the list on the left." = "在此添加 Agent，然后在左侧列表中更改各 Webhook 的状态或删除它。";
+"Turn on Multi-agent bubble to add agents here. In Simple mode, use the Preview mood buttons on the left." = "开启多 Agent 气泡以在此添加 Agent。简单模式下，请使用左侧的预览状态按钮。";
+"Webhooks are for the multi-agent bubble." = "Webhook 用于多 Agent 气泡。";
+"Notifications on" = "通知已开启";
+"Notifications muted" = "通知已静音";
+"Notifications denied" = "通知被拒绝";
+"Notifications unavailable" = "通知不可用";
+"Enable notifications" = "启用通知";
+"Available once installed as AgentPet.app" = "以 AgentPet.app 安装后可用";
+"Turn on in System Settings to get alerts" = "在系统设置中开启以接收提醒";
+"Alerts when an agent finishes or needs input" = "Agent 完成或需要输入时提醒";
+"Muted, the toggle turns alerts back on" = "已静音，拨动开关重新开启提醒";
+"When an agent finishes" = "当 Agent 完成时";
+"When an agent needs input" = "当 Agent 需要输入时";
+"Per-agent overrides win over \"All agents\". A custom line replaces the live/theme text and the real pet honours it." = "针对单个 Agent 的设置优先于\"所有 Agent\"。自定义文案会替换实时/主题文本，真实宠物也会生效。";
+"Whimsical phrases shown while agents work, e.g. \"Brewing…\" or \"Compiling…\"." = "Agent 工作时显示的趣味短语，例如 \"Brewing…\" 或 \"Compiling…\"。";
