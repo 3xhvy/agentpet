@@ -18,7 +18,7 @@ final class UpdaterController: NSObject, ObservableObject {
     private lazy var controller: SPUStandardUpdaterController = {
         SPUStandardUpdaterController(startingUpdater: true,
                                      updaterDelegate: self,
-                                     userDriverDelegate: nil)
+                                     userDriverDelegate: self)
     }()
 
     override init() {
@@ -68,6 +68,34 @@ extension UpdaterController: SPUUpdaterDelegate {
                 title: "AgentPet Updated",
                 body: "Active agent sessions were cleared because the app restarted to apply an update."
             )
+        }
+    }
+}
+
+// MARK: - SPUStandardUserDriverDelegate
+
+extension UpdaterController: SPUStandardUserDriverDelegate {
+    /// AgentPet runs as a menu-bar accessory, so Sparkle's update window/alert
+    /// would otherwise appear behind other apps without focus. Bring the app to
+    /// the front (and give it a Dock icon for the duration) so the user can act
+    /// on the prompt; AppKit hands the update window key focus once activated.
+    nonisolated func standardUserDriverWillShowModalAlert() {
+        Task { @MainActor in Self.activateForUpdateUI() }
+    }
+
+    nonisolated func standardUserDriverWillHandleShowingUpdate(
+        _ handleShowingUpdate: Bool, forUpdate update: SUAppcastItem, state: SPUUserUpdateState
+    ) {
+        guard handleShowingUpdate else { return }
+        Task { @MainActor in Self.activateForUpdateUI() }
+    }
+
+    @MainActor private static func activateForUpdateUI() {
+        NSApp.setActivationPolicy(.regular)
+        NSApp.activate(ignoringOtherApps: true)
+        // Bring the frontmost update window/alert to the front and make it key.
+        DispatchQueue.main.async {
+            NSApp.windows.first { $0.isVisible && $0.canBecomeKey }?.makeKeyAndOrderFront(nil)
         }
     }
 }
