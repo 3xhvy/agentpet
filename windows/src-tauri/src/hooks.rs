@@ -164,11 +164,21 @@ fn install(kind: &str) -> std::io::Result<()> {
     };
     let mut v = read_json(&path);
     let cmd = full_command(kind);
-    let obj = v.as_object_mut().unwrap();
+    // Refuse to rewrite a file we can't read as a JSON object (don't clobber it).
+    let Some(obj) = v.as_object_mut() else {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            format!("{} is not a JSON object; fix or remove it and try again", path.display()),
+        ));
+    };
     if s.style == Style::CursorFlat {
         obj.entry("version").or_insert(json!(1));
     }
-    let hooks = obj.entry("hooks").or_insert(json!({})).as_object_mut().unwrap();
+    // Ensure "hooks" is an object before we index into it.
+    if !obj.get("hooks").map_or(false, |h| h.is_object()) {
+        obj.insert("hooks".to_string(), json!({}));
+    }
+    let hooks = obj.get_mut("hooks").and_then(|h| h.as_object_mut()).unwrap();
     for event in s.events {
         let mut kept: Vec<Value> = hooks
             .get(*event)
