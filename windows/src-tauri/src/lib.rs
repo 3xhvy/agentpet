@@ -47,21 +47,36 @@ pub fn run() {
         .setup(|app| {
             server::start(app.handle().clone());
 
+            // Park the pet near the bottom-right of the primary screen. The
+            // config x/y is only a fallback; this keeps it on-screen on smaller
+            // or HiDPI displays where a fixed position could land off-screen.
+            if let Some(win) = app.get_webview_window("pet") {
+                if let Ok(Some(mon)) = win.primary_monitor() {
+                    let s = mon.scale_factor();
+                    let sz = mon.size();
+                    let x = (sz.width as f64 / s) - 200.0 - 40.0;
+                    let y = (sz.height as f64 / s) - 220.0 - 70.0;
+                    let _ = win.set_position(tauri::LogicalPosition::new(x.max(0.0), y.max(0.0)));
+                }
+            }
+
             // Tray menu , the pet window is frameless, so this is how you reach
             // Settings or quit the app.
             let settings_i = MenuItem::with_id(app, "settings", "Settings", true, None::<&str>)?;
             let quit_i = MenuItem::with_id(app, "quit", "Quit AgentPet", true, None::<&str>)?;
             let menu = Menu::with_items(app, &[&settings_i, &quit_i])?;
-            let _tray = TrayIconBuilder::new()
-                .icon(app.default_window_icon().unwrap().clone())
+            let mut tray = TrayIconBuilder::new()
                 .tooltip("AgentPet")
                 .menu(&menu)
                 .on_menu_event(|app, event| match event.id.as_ref() {
                     "settings" => open_settings(app.clone()),
                     "quit" => app.exit(0),
                     _ => {}
-                })
-                .build(app)?;
+                });
+            if let Some(icon) = app.default_window_icon() {
+                tray = tray.icon(icon.clone());
+            }
+            let _tray = tray.build(app)?;
             Ok(())
         })
         .run(tauri::generate_context!())
