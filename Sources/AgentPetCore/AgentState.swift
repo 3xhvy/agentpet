@@ -24,6 +24,8 @@ public enum AgentKind: String, Codable, Sendable {
     case opencode
     case windsurf
     case antigravity
+    case copilot
+    case kiroCLI
     /// Any CLI agent launched via the `agentpet run` wrapper.
     case cli
     case unknown

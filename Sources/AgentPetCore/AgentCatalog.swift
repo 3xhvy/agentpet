@@ -29,5 +29,9 @@ public enum AgentCatalog {
                          note: "No \"needs input\" alerts (Windsurf has no such hook)"),
         AgentIntegration(kind: .antigravity, displayName: "Antigravity", isSupported: true,
                          note: "No \"needs input\" alerts (Antigravity has no notification hook)"),
+        AgentIntegration(kind: .copilot, displayName: "GitHub Copilot", isSupported: true,
+                         note: "Copilot CLI only (~/.copilot/hooks)"),
+        AgentIntegration(kind: .kiroCLI, displayName: "Kiro CLI", isSupported: true,
+                         note: "Hooks the default Kiro CLI agent"),
     ]
 }

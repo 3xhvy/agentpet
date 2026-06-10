@@ -15,6 +15,10 @@ public enum HookStyle: Sendable {
     /// map lives under a named hook group instead of a top-level `"hooks"` key:
     /// `{"agentpet": {Event: [{"hooks": [{"type": "command", "command": ...}]}]}}`.
     case antigravityNested
+    /// Kiro CLI agent config `~/.kiro/agents/<agent>.json`: a `"hooks"` key merged
+    /// into the agent file as `{"hooks": {event: [{"command": ...}]}}` (plain
+    /// command items, no extra keys). Other agent fields are preserved.
+    case kiroFlat
 }
 
 /// Where and which lifecycle events to register for an agent.
@@ -69,6 +73,26 @@ public enum AgentHooks {
                 kind: .antigravity, style: .antigravityNested,
                 events: ["PreInvocation", "PreToolUse", "PostToolUse", "Stop"],
                 settingsPath: home + "/.gemini/config/hooks.json")
+        case .copilot:
+            // GitHub Copilot CLI: ~/.copilot/hooks/*.json, same flat shape as
+            // Cursor (version + {type:command, command}). PascalCase event names
+            // make Copilot send a snake_case payload with `hook_event_name`,
+            // which decodes via the Claude payload. PreToolUse is deliberately
+            // omitted: its command hook is fail-closed, so an error would block
+            // the user's tools.
+            return AgentHookSpec(
+                kind: .copilot, style: .cursorFlat,
+                events: ["SessionStart", "UserPromptSubmit", "PostToolUse", "Stop"],
+                settingsPath: home + "/.copilot/hooks/agentpet.json")
+        case .kiroCLI:
+            // Kiro CLI: hooks live inside an agent config file. We target the
+            // default agent. camelCase lifecycle events; STDIN carries
+            // hook_event_name/cwd/session_id (Claude-style). preToolUse omitted
+            // to avoid any chance of blocking tool calls.
+            return AgentHookSpec(
+                kind: .kiroCLI, style: .kiroFlat,
+                events: ["agentSpawn", "userPromptSubmit", "postToolUse", "stop"],
+                settingsPath: home + "/.kiro/agents/default.json")
         case .cli, .unknown:
             return nil
         }

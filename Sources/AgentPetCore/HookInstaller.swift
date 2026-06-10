@@ -246,8 +246,14 @@ public enum HookInstaller {
         switch style {
         case .claudeNested:
             try writeSettings(install(into: readSettings(path: path), command: command, events: events), path: path)
-        case .cursorFlat, .windsurfFlat:
-            try writeSettings(installFlat(into: readSettings(path: path), command: command, events: events, style: style), path: path)
+        case .cursorFlat, .windsurfFlat, .kiroFlat:
+            var s = installFlat(into: try readSettings(path: path), command: command, events: events, style: style)
+            // A Kiro agent file needs a name (the filename) to be a valid agent
+            // when we create it fresh; preserve any existing agent fields.
+            if style == .kiroFlat, s["name"] == nil {
+                s["name"] = ((path as NSString).lastPathComponent as NSString).deletingPathExtension
+            }
+            try writeSettings(s, path: path)
         case .antigravityNested:
             try writeSettings(installAntigravity(into: readSettings(path: path), command: command, events: events), path: path)
         case .opencodePlugin:
@@ -263,7 +269,7 @@ public enum HookInstaller {
         switch style {
         case .claudeNested:
             try writeSettings(uninstall(from: readSettings(path: path), events: events), path: path)
-        case .cursorFlat, .windsurfFlat:
+        case .cursorFlat, .windsurfFlat, .kiroFlat:
             try writeSettings(uninstallFlat(from: readSettings(path: path), events: events), path: path)
         case .antigravityNested:
             try writeSettings(uninstallAntigravity(from: readSettings(path: path), events: events), path: path)
@@ -279,7 +285,7 @@ public enum HookInstaller {
         switch style {
         case .claudeNested:
             return isInstalled(in: (try? readSettings(path: path)) ?? [:], events: events)
-        case .cursorFlat, .windsurfFlat:
+        case .cursorFlat, .windsurfFlat, .kiroFlat:
             return isInstalledFlat(in: (try? readSettings(path: path)) ?? [:], events: events)
         case .antigravityNested:
             return isInstalledAntigravity(in: (try? readSettings(path: path)) ?? [:], events: events)

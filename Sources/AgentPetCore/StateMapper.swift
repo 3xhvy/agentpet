@@ -77,6 +77,26 @@ public enum StateMapper {
             case "Stop": return .done
             default: return nil
             }
+        case .copilot:
+            // PascalCase events; PreToolUse is intentionally not registered
+            // (its command hook is fail-closed and could block tools).
+            switch eventName {
+            case "SessionStart": return .registered
+            case "UserPromptSubmit", "UserPromptSubmitted", "PostToolUse", "PreToolUse": return .working
+            case "Notification", "PermissionRequest": return .waiting
+            case "Stop", "AgentStop", "SessionEnd": return .done
+            default: return nil
+            }
+        case .kiroCLI:
+            // Kiro CLI sends camelCase event names; tolerate PascalCase too.
+            switch eventName {
+            case "agentSpawn", "AgentSpawn": return .registered
+            case "userPromptSubmit", "UserPromptSubmit", "preToolUse", "PreToolUse",
+                 "postToolUse", "PostToolUse": return .working
+            case "notification", "Notification": return .waiting
+            case "stop", "Stop": return .done
+            default: return nil
+            }
         case .cli, .unknown:
             return nil
         }
