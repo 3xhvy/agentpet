@@ -198,38 +198,56 @@ public enum ActivityFormatter {
 
     // MARK: Private
 
+    private enum ActivityCategory {
+        case reading, writing, running, searching, delegating, skill, generic
+    }
+
+    /// Maps a tool name to a category by keyword, case-insensitively. Works for
+    /// both Claude Code's tool names (`Read`, `Edit`, `Bash`, `Glob`, `Grep`,
+    /// `WebSearch`, `WebFetch`, `Agent`, `Task`, `Skill`) and other agents'
+    /// (e.g. Cursor's `read_file`, `edit_file`, `run_terminal_cmd`,
+    /// `codebase_search`, `list_dir`). Order matters: more specific categories
+    /// are checked first to avoid collisions.
+    private static func category(forToolName toolName: String) -> ActivityCategory {
+        let n = toolName.lowercased()
+        if n.contains("task") || n.contains("agent") { return .delegating }
+        if n.contains("skill") { return .skill }
+        if n.contains("search") || n.contains("grep") || n.contains("glob")
+            || n.contains("find") || n.contains("list") || n.contains("fetch") { return .searching }
+        if n.contains("run") || n.contains("shell") || n.contains("terminal")
+            || n.contains("bash") || n.contains("exec") || n.contains("command") { return .running }
+        if n.contains("edit") || n.contains("write") || n.contains("create")
+            || n.contains("patch") || n.contains("delete") { return .writing }
+        if n.contains("read") || n.contains("view") { return .reading }
+        return .generic
+    }
+
     private static func toolActivity(toolName: String?, toolInput: ToolActivityInput?) -> String? {
         guard let toolName else { return nil }
-        if let hint = extensionHint(toolName: toolName, filePath: toolInput?.filePath) { return hint }
+        let cat = category(forToolName: toolName)
+        if let hint = extensionHint(category: cat, filePath: toolInput?.filePath) { return hint }
         let phrases: [String]
-        switch toolName {
-        case "Read":
-            phrases = currentTheme.reading
-        case "Edit", "Write", "MultiEdit":
-            phrases = currentTheme.writing
-        case "Bash":
-            phrases = currentTheme.running
-        case "Glob", "Grep", "WebSearch", "WebFetch":
-            phrases = currentTheme.searching
-        case "Agent", "Task":
-            phrases = currentTheme.delegating
-        case "Skill":
-            phrases = currentTheme.skill
-        default:
-            phrases = currentTheme.generic
+        switch cat {
+        case .reading:    phrases = currentTheme.reading
+        case .writing:    phrases = currentTheme.writing
+        case .running:    phrases = currentTheme.running
+        case .searching:  phrases = currentTheme.searching
+        case .delegating: phrases = currentTheme.delegating
+        case .skill:      phrases = currentTheme.skill
+        case .generic:    phrases = currentTheme.generic
         }
         return pick(from: phrases, key: toolName)
     }
 
-    private static func extensionHint(toolName: String, filePath: String?) -> String? {
+    private static func extensionHint(category: ActivityCategory, filePath: String?) -> String? {
         guard let path = filePath else { return nil }
         let lower = path.lowercased()
         let isTest = lower.contains("tests/") || lower.hasSuffix("tests.swift") || lower.hasSuffix("test.swift")
         let isDoc  = lower.hasSuffix(".md") || lower.hasSuffix(".txt") || lower.hasSuffix(".rst")
         let isCfg  = lower.hasSuffix(".json") || lower.hasSuffix(".yaml") || lower.hasSuffix(".yml")
                   || lower.hasSuffix(".plist") || lower.hasSuffix(".toml")
-        let isRead  = toolName == "Read"
-        let isWrite = toolName == "Edit" || toolName == "Write" || toolName == "MultiEdit"
+        let isRead  = category == .reading
+        let isWrite = category == .writing
         if isTest  && isRead  { return "Reviewing tests…" }
         if isTest  && isWrite { return "Refining tests…" }
         if isDoc   && isRead  { return "Reading the docs…" }

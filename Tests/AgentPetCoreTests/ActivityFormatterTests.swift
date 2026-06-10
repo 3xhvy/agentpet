@@ -31,6 +31,51 @@ final class ActivityFormatterTests: XCTestCase {
         XCTAssertEqual(seen.count, poolSize, "should cycle through all \(poolSize) reading phrases")
     }
 
+    // MARK: - Tool categorization
+
+    func test_toolCategory_matchesClaudeToolNames() {
+        let cases: [(String, [String])] = [
+            ("Read", ActivityTheme.chef.reading),
+            ("Edit", ActivityTheme.chef.writing),
+            ("Write", ActivityTheme.chef.writing),
+            ("MultiEdit", ActivityTheme.chef.writing),
+            ("Bash", ActivityTheme.chef.running),
+            ("Glob", ActivityTheme.chef.searching),
+            ("Grep", ActivityTheme.chef.searching),
+            ("WebSearch", ActivityTheme.chef.searching),
+            ("WebFetch", ActivityTheme.chef.searching),
+            ("Agent", ActivityTheme.chef.delegating),
+            ("Task", ActivityTheme.chef.delegating),
+            ("Skill", ActivityTheme.chef.skill),
+        ]
+        for (toolName, pool) in cases {
+            let msg = ActivityFormatter.activityMessage(
+                eventName: "PreToolUse", sessionId: "cat-claude-\(toolName)",
+                toolName: toolName, toolInput: nil, explicitMessage: nil
+            )
+            XCTAssertTrue(pool.contains(msg ?? ""), "\(toolName) -> \(msg ?? "nil") not in expected pool")
+        }
+    }
+
+    func test_toolCategory_matchesCursorToolNames() {
+        let cases: [(String, [String])] = [
+            ("read_file", ActivityTheme.chef.reading),
+            ("edit_file", ActivityTheme.chef.writing),
+            ("delete_file", ActivityTheme.chef.writing),
+            ("run_terminal_cmd", ActivityTheme.chef.running),
+            ("codebase_search", ActivityTheme.chef.searching),
+            ("grep_search", ActivityTheme.chef.searching),
+            ("list_dir", ActivityTheme.chef.searching),
+        ]
+        for (toolName, pool) in cases {
+            let msg = ActivityFormatter.activityMessage(
+                eventName: "preToolUse", sessionId: "cat-cursor-\(toolName)",
+                toolName: toolName, toolInput: nil, explicitMessage: nil
+            )
+            XCTAssertTrue(pool.contains(msg ?? ""), "\(toolName) -> \(msg ?? "nil") not in expected pool")
+        }
+    }
+
     // MARK: - Extension hints
 
     func test_extensionHint_testFile_reading() {
