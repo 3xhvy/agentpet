@@ -309,7 +309,7 @@ final class BubbleSettings: ObservableObject {
     @Published var activityTheme: ActivityTheme {
         didSet {
             ud.set(activityTheme.rawValue, forKey: Keys.activityTheme)
-            ClaudeActivityFormatter.currentTheme = activityTheme
+            ActivityFormatter.currentTheme = activityTheme
         }
     }
 
@@ -368,7 +368,7 @@ final class BubbleSettings: ObservableObject {
         hiddenKinds        = Set((Self.loadJSON(Keys.hiddenKinds) as [String]? ?? []).compactMap(AgentKind.init(rawValue:)))
         iconChoices    = Self.loadJSON(Keys.iconChoices) ?? [:]
         activityTheme  = ActivityTheme(rawValue: ud.string(forKey: Keys.activityTheme) ?? "") ?? .chef
-        ClaudeActivityFormatter.currentTheme = activityTheme
+        ActivityFormatter.currentTheme = activityTheme
     }
 
     private func saveJSON<T: Encodable>(_ key: String, _ value: T) {

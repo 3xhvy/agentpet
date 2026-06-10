@@ -1,7 +1,7 @@
 import Foundation
 
 /// Tool arguments Claude Code sends on PreToolUse / PostToolUse hooks.
-public struct ClaudeToolInput: Decodable, Equatable, Sendable {
+public struct ToolActivityInput: Decodable, Equatable, Sendable {
     public let filePath: String?
     public let command: String?
     public let description: String?
@@ -160,7 +160,7 @@ public enum ActivityTheme: String, CaseIterable, Codable, Sendable {
 
 /// Turns Claude Code hook payloads into whimsical activity lines.
 /// Vocabulary is controlled by `currentTheme` (default: `.chef`).
-public enum ClaudeActivityFormatter {
+public enum ActivityFormatter {
 
     /// Set from `BubbleSettings.activityTheme.didSet` on the main thread.
     public nonisolated(unsafe) static var currentTheme: ActivityTheme = .chef
@@ -169,7 +169,7 @@ public enum ClaudeActivityFormatter {
         eventName: String,
         sessionId: String,
         toolName: String?,
-        toolInput: ClaudeToolInput?,
+        toolInput: ToolActivityInput?,
         explicitMessage: String?
     ) -> String? {
         if eventName == "Notification" {
@@ -198,7 +198,7 @@ public enum ClaudeActivityFormatter {
 
     // MARK: Private
 
-    private static func toolActivity(toolName: String?, toolInput: ClaudeToolInput?) -> String? {
+    private static func toolActivity(toolName: String?, toolInput: ToolActivityInput?) -> String? {
         guard let toolName else { return nil }
         if let hint = extensionHint(toolName: toolName, filePath: toolInput?.filePath) { return hint }
         let phrases: [String]

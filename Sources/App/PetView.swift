@@ -799,7 +799,7 @@ private struct AgentRow: View {
         }
         let m = session.message?.trimmingCharacters(in: .whitespaces) ?? ""
         if !m.isEmpty { return m }
-        return ClaudeActivityFormatter.stateMessage(for: session.state)
+        return ActivityFormatter.stateMessage(for: session.state)
             ?? session.state.rawValue.capitalized
     }
 

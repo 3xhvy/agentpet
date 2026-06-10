@@ -8,7 +8,7 @@ public struct ClaudeHookPayload: Decodable, Equatable {
     public let hookEventName: String?
     public let message: String?
     public let toolName: String?
-    public let toolInput: ClaudeToolInput?
+    public let toolInput: ToolActivityInput?
     /// Absolute path to the conversation's JSONL transcript file.
     public let transcriptPath: String?
 
@@ -30,7 +30,7 @@ public struct ClaudeHookPayload: Decodable, Equatable {
     /// fields (session id and event name) are missing.
     public func makeEvent(now: Date, kind: AgentKind = .claude) -> AgentEvent? {
         guard let sessionId, let hookEventName else { return nil }
-        let context = ClaudeActivityFormatter.activityMessage(
+        let context = ActivityFormatter.activityMessage(
             eventName: hookEventName,
             sessionId: sessionId,
             toolName: toolName,
