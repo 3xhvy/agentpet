@@ -80,6 +80,33 @@ final class SessionStoreTests: XCTestCase {
         XCTAssertEqual(store.sessions.count, 1)
     }
 
+    func testApplyKeepsModelWhenLaterEventOmitsIt() {
+        let store = SessionStore()
+        let withModel = AgentEvent(
+            sessionId: "s1", agentKind: .claude, eventName: "SessionStart",
+            project: "/proj", message: nil, model: "Sonnet 4.6", timestamp: t0
+        )
+        store.apply(withModel, now: t0)
+
+        let withoutModel = AgentEvent(
+            sessionId: "s1", agentKind: .claude, eventName: "Stop",
+            project: "/proj", message: nil, model: nil, timestamp: t0.addingTimeInterval(5)
+        )
+        let updated = store.apply(withoutModel, now: t0.addingTimeInterval(5))
+
+        XCTAssertEqual(updated?.model, "Sonnet 4.6", "model should persist when a later event omits it")
+    }
+
+    func testApplySetsModelOnNewSession() {
+        let store = SessionStore()
+        let withModel = AgentEvent(
+            sessionId: "s1", agentKind: .claude, eventName: "SessionStart",
+            project: "/proj", message: nil, model: "Sonnet 4.6", timestamp: t0
+        )
+        let s = store.apply(withModel, now: t0)
+        XCTAssertEqual(s?.model, "Sonnet 4.6")
+    }
+
     func testApplyIgnoresUnmappedEvent() {
         let store = SessionStore()
         XCTAssertNil(store.apply(event("Bogus"), now: t0))
