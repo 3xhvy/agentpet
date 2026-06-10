@@ -198,11 +198,11 @@ struct BubbleSettingsView: View {
 
     private func moodLabel(_ mood: PetMood) -> String {
         switch mood {
-        case .working:   return "Working"
-        case .waiting:   return "Waiting"
-        case .done:      return "Done"
-        case .celebrate: return "Celebrate"
-        case .idle:      return "Idle"
+        case .working:   return NSLocalizedString("Working", comment: "pet mood")
+        case .waiting:   return NSLocalizedString("Waiting", comment: "pet mood")
+        case .done:      return NSLocalizedString("Done", comment: "pet mood")
+        case .celebrate: return NSLocalizedString("Celebrate", comment: "pet mood")
+        case .idle:      return NSLocalizedString("Idle", comment: "pet mood")
         }
     }
 
