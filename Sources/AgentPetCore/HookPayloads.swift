@@ -5,11 +5,15 @@ public struct CursorHookPayload: Decodable, Equatable {
     public let conversationId: String?
     public let hookEventName: String?
     public let workspaceRoots: [String]?
+    public let toolName: String?
+    public let toolInput: ToolActivityInput?
 
     enum CodingKeys: String, CodingKey {
         case conversationId = "conversation_id"
         case hookEventName = "hook_event_name"
         case workspaceRoots = "workspace_roots"
+        case toolName = "tool_name"
+        case toolInput = "tool_input"
     }
 
     public static func decode(from data: Data) -> CursorHookPayload? {
@@ -18,9 +22,13 @@ public struct CursorHookPayload: Decodable, Equatable {
 
     public func makeEvent(now: Date) -> AgentEvent? {
         guard let conversationId, let hookEventName else { return nil }
+        let context = ActivityFormatter.activityMessage(
+            eventName: hookEventName, sessionId: conversationId,
+            toolName: toolName, toolInput: toolInput, explicitMessage: nil
+        )
         return AgentEvent(
             sessionId: conversationId, agentKind: .cursor, eventName: hookEventName,
-            project: workspaceRoots?.first, message: nil, timestamp: now
+            project: workspaceRoots?.first, message: context, timestamp: now
         )
     }
 }

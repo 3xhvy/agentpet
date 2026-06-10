@@ -133,6 +133,24 @@ final class MultiAgentHookTests: XCTestCase {
         XCTAssertEqual(ev?.agentKind, .cursor)
     }
 
+    func testCursorPreToolUseReadFileActivityMessage() {
+        let json = #"{"conversation_id":"c10","hook_event_name":"preToolUse","tool_name":"read_file","tool_input":{"file_path":"README.md"},"workspace_roots":["/proj"]}"#
+        let ev = HookPayload.event(forAgent: .cursor, stdin: Data(json.utf8), now: Date())
+        XCTAssertEqual(ev?.message, "Reading the docs…")
+    }
+
+    func testCursorPreToolUseRunCommandActivityMessage() {
+        let json = #"{"conversation_id":"c11","hook_event_name":"preToolUse","tool_name":"run_terminal_cmd","tool_input":{"command":"npm test"},"workspace_roots":["/proj"]}"#
+        let ev = HookPayload.event(forAgent: .cursor, stdin: Data(json.utf8), now: Date())
+        XCTAssertTrue(ActivityTheme.chef.running.contains(ev?.message ?? ""), "got \(ev?.message ?? "nil")")
+    }
+
+    func testCursorStopHasNoActivityMessage() {
+        let json = #"{"conversation_id":"c12","hook_event_name":"stop","workspace_roots":["/proj"]}"#
+        let ev = HookPayload.event(forAgent: .cursor, stdin: Data(json.utf8), now: Date())
+        XCTAssertNil(ev?.message)
+    }
+
     func testWindsurfPayloadDecode() {
         let json = #"{"trajectory_id":"t1","agent_action_name":"post_cascade_response","model_name":"x"}"#
         let ev = HookPayload.event(forAgent: .windsurf, stdin: Data(json.utf8), now: Date())
