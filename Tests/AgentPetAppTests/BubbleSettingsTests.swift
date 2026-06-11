@@ -49,4 +49,19 @@ final class BubbleSettingsTests: XCTestCase {
         UserDefaults.standard.set(false, forKey: collapseDuplicatesKey)
         XCTAssertEqual(BubbleSettings().sessionGrouping, .allSessions)
     }
+
+    func testModelTokenExistsAndHasMetadata() {
+        XCTAssertTrue(BubbleToken.allCases.contains(.model))
+        XCTAssertEqual(BubbleToken.model.shortName, "Model")
+        XCTAssertEqual(BubbleToken.model.chipSymbol, "cpu")
+    }
+
+    func testModelTokenVisibilityInPresets() {
+        func isVisible(_ layout: BubbleLayout) -> Bool? {
+            layout.tokens.first { $0.token == .model }?.isVisible
+        }
+        XCTAssertEqual(isVisible(.original), false)
+        XCTAssertEqual(isVisible(.standard), false)
+        XCTAssertEqual(isVisible(.detailed), true)
+    }
 }

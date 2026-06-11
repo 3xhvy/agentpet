@@ -10,6 +10,10 @@ public struct AgentSession: Identifiable, Sendable, Equatable {
     public var title: String?
     public var state: AgentState
     public var message: String?
+    /// Display name of the LLM model in use (e.g. "Sonnet 4.6"), if any hook
+    /// event for this session reported one. Sticky: once set, persists across
+    /// later events that omit it.
+    public var model: String?
     public var source: AgentSource
     public var updatedAt: Date
     /// When the session entered its current `state`; resets on state change.
@@ -22,6 +26,7 @@ public struct AgentSession: Identifiable, Sendable, Equatable {
         title: String? = nil,
         state: AgentState,
         message: String? = nil,
+        model: String? = nil,
         source: AgentSource,
         updatedAt: Date,
         stateSince: Date? = nil
@@ -32,6 +37,7 @@ public struct AgentSession: Identifiable, Sendable, Equatable {
         self.title = title
         self.state = state
         self.message = message
+        self.model = model
         self.source = source
         self.updatedAt = updatedAt
         self.stateSince = stateSince ?? updatedAt

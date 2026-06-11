@@ -82,6 +82,7 @@ public final class SessionStore {
             existing.state = state
             existing.updatedAt = now
             if let project = event.project { existing.project = project }
+            if let model = event.model { existing.model = model }
             existing.message = event.message
             byID[event.sessionId] = existing
             return existing
@@ -92,6 +93,7 @@ public final class SessionStore {
             project: event.project,
             state: state,
             message: event.message,
+            model: event.model,
             source: .hook,
             updatedAt: now
         )

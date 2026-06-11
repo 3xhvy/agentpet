@@ -5,7 +5,7 @@ import AgentPetCore
 // MARK: - Token types
 
 enum BubbleToken: String, CaseIterable, Codable, Identifiable {
-    case dot, icon, title, project, separator, message, stateLabel, elapsed
+    case dot, icon, title, project, separator, message, stateLabel, elapsed, model
     var id: String { rawValue }
 
     var displayName: String {
@@ -18,6 +18,7 @@ enum BubbleToken: String, CaseIterable, Codable, Identifiable {
         case .message:    return NSLocalizedString("Activity message", comment: "")
         case .stateLabel: return NSLocalizedString("State label", comment: "")
         case .elapsed:    return NSLocalizedString("Elapsed time", comment: "")
+        case .model:      return NSLocalizedString("Model", comment: "")
         }
     }
 
@@ -31,6 +32,7 @@ enum BubbleToken: String, CaseIterable, Codable, Identifiable {
         case .message:    return NSLocalizedString("Message", comment: "")
         case .stateLabel: return "State"
         case .elapsed:    return NSLocalizedString("Elapsed", comment: "")
+        case .model:      return NSLocalizedString("Model", comment: "")
         }
     }
 
@@ -44,6 +46,7 @@ enum BubbleToken: String, CaseIterable, Codable, Identifiable {
         case .message:    return "bubble.left.fill"
         case .stateLabel: return "tag.fill"
         case .elapsed:    return "clock.fill"
+        case .model:      return "cpu"
         }
     }
 
@@ -57,6 +60,7 @@ enum BubbleToken: String, CaseIterable, Codable, Identifiable {
         case .message:    return .indigo
         case .stateLabel: return .yellow
         case .elapsed:    return .teal
+        case .model:      return .pink
         }
     }
 }
@@ -79,6 +83,7 @@ struct BubbleLayout: Codable, Equatable {
         .init(token: .title,      isVisible: false),
         .init(token: .stateLabel, isVisible: false),
         .init(token: .elapsed,    isVisible: false),
+        .init(token: .model,      isVisible: false),
     ])
 
     static let standard = BubbleLayout(tokens: [
@@ -90,6 +95,7 @@ struct BubbleLayout: Codable, Equatable {
         .init(token: .message,    isVisible: true),
         .init(token: .stateLabel, isVisible: false),
         .init(token: .elapsed,    isVisible: false),
+        .init(token: .model,      isVisible: false),
     ])
 
     static let detailed = BubbleLayout(tokens: [
@@ -101,6 +107,7 @@ struct BubbleLayout: Codable, Equatable {
         .init(token: .message,    isVisible: true),
         .init(token: .stateLabel, isVisible: true),
         .init(token: .elapsed,    isVisible: true),
+        .init(token: .model,      isVisible: true),
     ])
 
 }
