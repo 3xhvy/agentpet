@@ -118,7 +118,7 @@
         <div class="group">
           <div class="ghead" id="t-choose">Choose pet</div>
           <div class="gcard pad">
-            <input id="pet-search" type="text" placeholder="Search your pets" autocomplete="off" style="display:none" />
+            <div class="search-wrap" id="pet-search-wrap" style="display:none"><span class="mag">⌕</span><input id="pet-search" type="text" placeholder="Search your pets" autocomplete="off" /></div>
             <div id="lib-empty" class="cap" style="padding: 6px 0" hidden><span id="t-lib-empty">No pets yet. Tap Browse to add one.</span></div>
             <div id="pet-results" class="pet-results"></div>
             <div class="pager-nav" id="pet-pager">
@@ -136,7 +136,7 @@
         <div class="group">
           <div class="ghead" id="t-anims">Animations</div>
           <div class="gcard pad">
-            <span class="seg seg-full" id="anim-mood">
+            <span class="seg" id="anim-mood">
               <button data-v="idle" id="am-idle">Idle</button>
               <button data-v="working" class="sel" id="am-working">Working</button>
               <button data-v="waiting" id="am-waiting">Waiting</button>
@@ -151,10 +151,8 @@
         <div class="group">
           <div class="ghead" id="t-size">Size on screen</div>
           <div class="gcard">
-            <div class="row"><span id="t-petsize">Pet size</span>
-              <span class="slider-wrap"><input type="range" id="pet-size" min="70" max="130" /><span class="val dim" id="pet-size-val"></span>
+            <div class="row"><span class="slider-wrap wide"><input type="range" id="pet-size" min="70" max="130" /><span class="val dim" id="pet-size-val"></span>
               <span class="size-presets"><button data-size="80">S</button><button data-size="100">M</button><button data-size="125">L</button></span></span></div>
-            <label class="row"><span id="t-fx">Idle bobbing animation</span><input type="checkbox" id="fx" /></label>
           </div>
         </div>
       </div>
@@ -196,18 +194,18 @@
         <div class="group">
           <div class="ghead" id="t-display">Display</div>
           <div class="gcard">
-            <div class="row col"><div class="row inner"><span id="t-rows">Rows</span>
+            <div class="row col"><span class="stack-label" id="t-rows">Rows</span>
               <span class="seg" id="bub-mode" data-key="ap_bub_mode" data-default="carousel">
                 <button data-v="list" id="o-bm-list">All rows</button>
                 <button data-v="carousel" id="o-bm-carousel">Carousel</button>
                 <button data-v="compact" id="o-bm-compact">Compact</button>
-              </span></div>
+              </span>
               <div class="cap" id="bub-mode-detail"></div></div>
-            <div class="row col"><div class="row inner"><span id="t-grouping">Sessions</span>
+            <div class="row col"><span class="stack-label" id="t-grouping">Sessions</span>
               <span class="seg" id="bub-grouping" data-key="ap_bub_grouping" data-default="byKind">
                 <button data-v="byKind" id="o-bg-kind">Grouped by agent</button>
                 <button data-v="all" id="o-bg-all">All sessions</button>
-              </span></div>
+              </span>
               <div class="cap" id="bub-grouping-detail"></div></div>
             <div class="row" id="maxrows-row"><span id="t-maxrows">Max rows</span>
               <span class="slider-wrap"><input type="range" id="bub-max" min="1" max="10" /><span class="val dim" id="bub-max-val"></span></span></div>
@@ -230,7 +228,9 @@
         <div class="group">
           <div class="ghead" id="t-rowcontent">Row content</div>
           <div class="gcard pad">
+            <div class="cap" id="t-preview-cap" style="margin-bottom:5px">Preview</div>
             <div id="bub-preview" class="bub-preview"></div>
+            <div id="bub-palette" class="bub-tokens"></div>
             <div id="bub-tokens" class="bub-tokens"></div>
             <div class="row tight"><span class="cap" id="t-presets">Presets</span>
               <span class="preset-btns">
@@ -276,40 +276,44 @@
                 <option value="scientist" id="o-ph-scientist">🔬 Scientist</option>
               </select></div>
           </div>
+          <div class="cap gfoot" id="t-vocab-foot">Whimsical phrases shown while agents work, e.g. "Brewing…" or "Compiling…".</div>
         </div>
 
         <div class="group">
           <div class="ghead" id="t-messages">Bubble messages</div>
           <div class="gcard pad">
             <div class="row tight"><span id="t-msg-src">Messages</span>
-              <select id="msg-src">
-                <option value="system" id="o-ms-system">System</option>
-                <option value="custom" id="o-ms-custom">Custom</option>
-              </select></div>
+              <span class="seg" id="msg-src" data-key="ap_msg_src" data-default="system">
+                <button data-v="system" id="o-ms-system">System</button>
+                <button data-v="custom" id="o-ms-custom">Custom</button>
+              </span></div>
             <div id="msg-custom-wrap">
-              <div class="cap" id="t-msg-help" style="margin: 4px 0 8px">Custom messages (one per line, leave empty for default)</div>
-              <div class="row tight"><span id="t-msg-agent">For agent</span><select id="msg-agent"></select></div>
+              <div class="row tight"><span id="t-msg-agent">Agent</span><select id="msg-agent"></select></div>
               <div id="msg-editors"></div>
-              <div class="row center"><button class="linklike" id="msg-reset">Reset to defaults</button></div>
+              <div class="row tight"><span class="cap" id="t-msg-help">One message per line; a random one is shown.</span>
+                <button class="mini" id="msg-reset">Reset to defaults</button></div>
             </div>
           </div>
+          <div class="cap gfoot" id="t-msg-foot">Per-agent overrides win over "All agents". A custom line replaces the live/theme text and the real pet honours it.</div>
         </div>
       </div>
 
       <!-- =============================== ABOUT =============================== -->
       <div class="page" data-page="about">
-        <div class="about-hero">
-          <svg viewBox="0 0 24 24" fill="currentColor" class="about-paw"><circle cx="5.2" cy="10.2" r="2.1"/><circle cx="9.3" cy="6.4" r="2.2"/><circle cx="14.7" cy="6.4" r="2.2"/><circle cx="18.8" cy="10.2" r="2.1"/><path d="M12 10.5c-2.6 0-5.4 2.5-5.4 5 0 1.6 1.2 2.6 2.7 2.6 1 0 1.8-.4 2.7-.4s1.7.4 2.7.4c1.5 0 2.7-1 2.7-2.6 0-2.5-2.8-5-5.4-5z"/></svg>
-          <div class="about-title">AgentPet</div>
-          <div class="cap" id="t-tagline">A desktop pet that watches your AI coding agents.</div>
+        <div class="group">
+          <div class="gcard about-hero">
+            <svg viewBox="0 0 24 24" fill="currentColor" class="about-paw"><circle cx="5.2" cy="10.2" r="2.1"/><circle cx="9.3" cy="6.4" r="2.2"/><circle cx="14.7" cy="6.4" r="2.2"/><circle cx="18.8" cy="10.2" r="2.1"/><path d="M12 10.5c-2.6 0-5.4 2.5-5.4 5 0 1.6 1.2 2.6 2.7 2.6 1 0 1.8-.4 2.7-.4s1.7.4 2.7.4c1.5 0 2.7-1 2.7-2.6 0-2.5-2.8-5-5.4-5z"/></svg>
+            <div class="about-title">AgentPet</div>
+            <div class="cap" id="t-tagline">A desktop pet that watches your AI coding agents.</div>
+          </div>
         </div>
         <div class="group">
           <div class="gcard pad btns">
             <button class="prominent pill" data-url="https://github.com/ntd4996/agentpet"><span>★</span> <span id="t-star">Star on GitHub</span></button>
             <button class="ghost-btn pill" data-url="https://discord.gg/kzFJKsZav"><span>💬</span> <span id="t-discord">Join the Discord</span></button>
             <button class="ghost-btn pill" data-url="https://buymeacoffee.com/ntd4996"><span>☕</span> <span id="t-coffee">Buy me a coffee</span></button>
-            <div class="cap center" id="t-thanks">If AgentPet helps your workflow, a star means a lot. Thank you!</div>
           </div>
+          <div class="cap gfoot" id="t-thanks">If AgentPet helps your workflow, a star means a lot. Thank you!</div>
         </div>
         <div class="group">
           <div class="ghead" id="t-author">Author</div>

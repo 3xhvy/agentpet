@@ -161,7 +161,7 @@ function libraryView(): LibPet[] {
 
 function renderPage() {
   const lib = getLibrary();
-  search.style.display = lib.length > 4 ? "" : "none"; // mac shows search only when >4
+  (document.getElementById("pet-search-wrap") as HTMLElement).style.display = lib.length > 4 ? "" : "none"; // mac shows search only when >4
   (document.getElementById("lib-empty") as HTMLElement).hidden = lib.length > 0;
   const view = libraryView();
   const totalPages = Math.max(1, Math.ceil(view.length / PER_PAGE));
@@ -452,7 +452,7 @@ const MSG_STATES: [string, string][] = [
 const MSG_AGENTS: [string, string][] = [
   ["all", "All agents"], ["claude", "Claude Code"], ["codex", "Codex"], ["gemini", "Gemini CLI"],
   ["cursor", "Cursor"], ["opencode", "opencode"], ["windsurf", "Windsurf"],
-  ["antigravity", "Antigravity"], ["kiro", "Kiro CLI"], ["copilot", "GitHub Copilot"],
+  ["antigravity", "Antigravity"], ["copilot", "GitHub Copilot"], ["kiro", "Kiro CLI"],
 ];
 
 function initBubble() {
@@ -498,13 +498,11 @@ function initBubble() {
   msgAgent.onchange = () => build(msgAgent.value);
   build("all");
 
-  // System/custom source + reset, like the macOS BubbleMessages.
-  const src = document.getElementById("msg-src") as HTMLSelectElement;
+  // System/custom source (segmented, saved by initSegs) + reset.
   const customWrap = document.getElementById("msg-custom-wrap") as HTMLElement;
-  const syncSrc = () => { customWrap.style.display = src.value === "custom" ? "" : "none"; };
-  src.value = localStorage.getItem("ap_msg_src") || "system";
+  const syncSrc = () => { customWrap.style.display = (localStorage.getItem("ap_msg_src") || "system") === "custom" ? "" : "none"; };
   syncSrc();
-  src.onchange = () => { localStorage.setItem("ap_msg_src", src.value); syncSrc(); changed(); };
+  document.addEventListener("seg-changed", (e) => { if ((e as CustomEvent).detail === "ap_msg_src") syncSrc(); });
   (document.getElementById("msg-reset") as HTMLButtonElement).onclick = () => {
     for (const [st] of MSG_STATES) localStorage.removeItem(`ap_msg_${msgAgent.value}_${st}`);
     build(msgAgent.value);
@@ -583,8 +581,10 @@ function initBubbleDisplay() {
     visRoot.appendChild(row);
   }
 
-  // Row content: token toggles in order + presets + live preview.
+  // Row content: colored chips (mac PaletteChip/CanvasChip) , a palette row
+  // of addable tokens and an active row with removable ones, in order.
   const tokensRoot = document.getElementById("bub-tokens")!;
+  const paletteRoot = document.getElementById("bub-palette")!;
   const readTokens = (): TokenItem[] => readBubbleConfig().tokens;
   const saveTokens = (tokens: TokenItem[]) => {
     localStorage.setItem("ap_bub_tokens", JSON.stringify(tokens));
@@ -592,23 +592,36 @@ function initBubbleDisplay() {
     paintTokens();
     paintPreview();
   };
-  const TOKEN_NAMES: Record<BubbleToken, string> = {
-    dot: "State dot", icon: "Agent icon", title: "Chat title", project: "Project folder",
-    separator: "Separator", message: "Activity message", stateLabel: "State label", elapsed: "Elapsed time",
+  const TOKEN_META: Record<BubbleToken, { name: string; sym: string; color: string }> = {
+    dot:        { name: "Dot",     sym: "●", color: "#ff9f0a" },
+    icon:       { name: "Icon",    sym: "✦", color: "#bf5af2" },
+    title:      { name: "Title",   sym: "❝", color: "#0a84ff" },
+    project:    { name: "Project", sym: "▤", color: "#30d158" },
+    separator:  { name: "Sep",     sym: "→", color: "#98989d" },
+    message:    { name: "Message", sym: "💬", color: "#5e5ce6" },
+    stateLabel: { name: "State",   sym: "🏷", color: "#ffd60a" },
+    elapsed:    { name: "Elapsed", sym: "🕐", color: "#40c8e0" },
   };
+  function chip(tokenItem: TokenItem, active: boolean): HTMLButtonElement {
+    const m = TOKEN_META[tokenItem.token];
+    const b = document.createElement("button");
+    b.className = "tok-chip2";
+    b.style.setProperty("--tc", m.color);
+    b.innerHTML = `<span class="tc-sym">${m.sym}</span> ${t(m.name)} <span class="tc-act">${active ? "✕" : "＋"}</span>`;
+    b.onclick = () => {
+      const tokens = readTokens().map((x) =>
+        x.token === tokenItem.token ? { ...x, isVisible: !active } : x);
+      saveTokens(tokens);
+    };
+    return b;
+  }
   function paintTokens() {
     tokensRoot.innerHTML = "";
+    paletteRoot.innerHTML = "";
     for (const item of readTokens()) {
-      const chip = document.createElement("button");
-      chip.className = "tok-chip" + (item.isVisible ? " on" : "");
-      chip.textContent = t(TOKEN_NAMES[item.token]);
-      chip.onclick = () => {
-        const tokens = readTokens().map((x) =>
-          x.token === item.token ? { ...x, isVisible: !x.isVisible } : x);
-        saveTokens(tokens);
-      };
-      tokensRoot.appendChild(chip);
+      (item.isVisible ? tokensRoot : paletteRoot).appendChild(chip(item, item.isVisible));
     }
+    paletteRoot.style.display = paletteRoot.childElementCount ? "" : "none";
   }
   document.querySelectorAll<HTMLButtonElement>(".preset-btns button").forEach((b) => {
     b.onclick = () => saveTokens(LAYOUT_PRESETS[b.dataset.preset!]);
@@ -639,6 +652,7 @@ function initBubbleDisplay() {
     }
     if (!row.childElementCount) { row.textContent = t("(empty)"); row.classList.add("pv-dim"); }
     preview.appendChild(row);
+    row.style.display = "inline-flex";
   }
 
   paintTokens();
@@ -660,9 +674,6 @@ function initPetControls() {
     };
   });
 
-  const fx = document.getElementById("fx") as HTMLInputElement;
-  fx.checked = localStorage.getItem("ap_fx") === "1"; // mac default: pet stands still
-  fx.onchange = () => { localStorage.setItem("ap_fx", fx.checked ? "1" : "0"); changed(); };
 
 }
 
@@ -989,8 +1000,6 @@ function applyStatic() {
   set("am-waiting", "Waiting");
   set("am-done", "Done");
   set("am-celebrate", "Celebrate");
-  set("t-petsize", "Pet size");
-  set("t-fx", "Idle bobbing animation");
   // bubble
   set("t-appearance", "Appearance");
   set("t-theme", "Theme");
@@ -1018,6 +1027,9 @@ function applyStatic() {
   set("t-visible", "Visible agents");
   set("t-rowcontent", "Row content");
   set("t-presets", "Presets");
+  set("t-preview-cap", "Preview");
+  set("t-vocab-foot", "Whimsical phrases shown while agents work, e.g. \"Brewing…\" or \"Compiling…\".");
+  set("t-msg-foot", "Per-agent overrides win over \"All agents\". A custom line replaces the live/theme text and the real pet honours it.");
   set("t-pr-original", "Original");
   set("t-pr-standard", "Standard");
   set("t-pr-detailed", "Detailed");
@@ -1040,8 +1052,8 @@ function applyStatic() {
   set("o-ms-system", "System");
   set("o-ms-custom", "Custom");
   set("msg-reset", "Reset to defaults");
-  set("t-msg-help", "Custom messages (one per line, leave empty for default)");
-  set("t-msg-agent", "For agent");
+  set("t-msg-help", "One message per line; a random one is shown.");
+  set("t-msg-agent", "Agent");
   // codex help
   set("t-cdx-title", "How to connect Codex");
   set("t-cdx-1", "Install the hook here (it also enables hooks in Codex's config.toml).");

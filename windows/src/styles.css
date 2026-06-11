@@ -665,3 +665,44 @@ body.settings:not(.demo-open) .main-col { flex: 1 1 auto; width: auto; }
 .anim-cell canvas { width: 54px; height: 44px; image-rendering: pixelated; }
 .anim-cell:hover { background: rgba(255,255,255,0.06); }
 .anim-cell.sel { border: 2px solid var(--accent); background: rgba(10,132,255,0.16); padding: 5px 4px 3px; }
+
+/* ---- mac audit round 2 ---- */
+/* Quit = gray button left (mac) */
+.gcard .row.center { justify-content: flex-start; }
+.quit { background: rgba(255,255,255,0.12); color: var(--txt); border-radius: 7px; padding: 5px 13px; font-size: 12.5px; }
+.quit:hover { background: rgba(255,255,255,0.2); text-decoration: none; }
+/* pet cells fixed-width centered in 4 columns (mac PetThumb) */
+.pet-results { grid-template-columns: repeat(4, 1fr); justify-items: center; }
+.pet-item { width: 92px; }
+/* search with magnifier */
+.search-wrap { position: relative; }
+.search-wrap .mag { position: absolute; left: 9px; top: 50%; transform: translateY(-54%); color: var(--sec); font-size: 15px; }
+.search-wrap input {
+  width: 100%; background: rgba(0,0,0,0.26); color: var(--txt);
+  border: 1px solid var(--hair); border-radius: 9px; padding: 7px 10px 7px 28px; font-size: 12.5px; outline: none;
+}
+.search-wrap input:focus { border-color: rgba(10,132,255,0.6); }
+/* clip cells fixed width */
+.anim-grid { grid-template-columns: repeat(auto-fill, 78px); }
+/* wide slider rows (Size on screen, Opacity) */
+.slider-wrap.wide { max-width: none; }
+.bubble-row input[type="range"], .slider-wrap input[type="range"] { max-width: none; }
+.slider-wrap { max-width: 320px; }
+/* stacked display rows (mac Display section) */
+.stack-label { font-size: 13px; font-weight: 500; margin-bottom: 5px; }
+.row.col .seg { align-self: flex-start; margin-bottom: 4px; }
+/* colored token chips (mac chipColor) */
+.tok-chip2 {
+  display: inline-flex; align-items: center; gap: 5px;
+  border: 1px solid color-mix(in srgb, var(--tc) 45%, transparent);
+  background: color-mix(in srgb, var(--tc) 12%, transparent);
+  color: var(--txt); border-radius: 999px;
+  padding: 4px 11px; font-size: 12px; font-weight: 500; cursor: pointer;
+}
+.tok-chip2 .tc-sym { color: var(--tc); font-size: 11px; }
+.tok-chip2 .tc-act { color: color-mix(in srgb, var(--tc) 70%, transparent); font-size: 10px; font-weight: 700; }
+.tok-chip2:hover { background: color-mix(in srgb, var(--tc) 20%, transparent); }
+/* section footer captions */
+.gfoot { margin: 6px 12px 0; }
+/* about hero on a card */
+.gcard.about-hero { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 18px 14px; text-align: center; }

@@ -64,8 +64,8 @@ pub fn catalog() -> Vec<AgentInfo> {
         ("opencode", "opencode", None),
         ("windsurf", "Windsurf", Some("No \"needs input\" alerts (Windsurf has no such hook)")),
         ("antigravity", "Antigravity", Some("No \"needs input\" alerts (Antigravity has no notification hook)")),
-        ("kiro", "Kiro CLI", Some("Hooks the default Kiro CLI agent")),
         ("copilot", "GitHub Copilot", Some("Copilot CLI only (~/.copilot/hooks)")),
+        ("kiro", "Kiro CLI", Some("Hooks the default Kiro CLI agent")),
     ];
     entries.iter().map(|(kind, name, note)| AgentInfo {
         kind: kind.to_string(),
