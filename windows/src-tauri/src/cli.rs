@@ -2,7 +2,11 @@
 //! reads the agent's payload (explicit flags for the opencode plugin, otherwise
 //! JSON on stdin), extracts the essentials, and POSTs them to the running app's
 //! localhost listener. ALWAYS exits 0 so it never blocks an agent (Copilot
-//! PreToolUse is fail-closed). If the app isn't running, the POST fails silently.
+//! PreToolUse is fail-closed). If the app isn't running, the event is queued on
+//! disk and replayed on the next launch (like the macOS app's event queue).
+//!
+//! Also hosts `agentpet run -- <cmd...>`: wraps any CLI agent, keeping the
+//! session `working` (with a heartbeat) while it runs and `done` on exit.
 
 use serde_json::Value;
 use std::io::{Read, Write};
@@ -14,14 +18,14 @@ pub fn run_hook(args: &[String]) {
     // Explicit flags win (opencode plugin + the run wrapper). `--event` carries a
     // normalised state directly there.
     if let Some(event) = flag(args, "--event") {
-        post_and_exit(
-            &agent,
-            &event,
-            &flag(args, "--session").unwrap_or_default(),
-            &flag(args, "--project").unwrap_or_default(),
-            &flag(args, "--message").unwrap_or_default(),
-            "",
-        );
+        post_and_exit(Payload {
+            agent,
+            event,
+            session: flag(args, "--session").unwrap_or_default(),
+            project: flag(args, "--project").unwrap_or_default(),
+            message: flag(args, "--message").unwrap_or_default(),
+            ..Payload::default()
+        });
     }
 
     // Otherwise decode the JSON the agent pipes on stdin. Field names vary by
@@ -42,48 +46,152 @@ pub fn run_hook(args: &[String]) {
                 .map(String::from)
         })
         .unwrap_or_default();
-    let tool = first_str(&v, &["tool_name", "toolName"]).unwrap_or_default();
-    let message = first_str(&v, &["message"])
-        .or_else(|| tool_message(&tool, v.get("tool_input")))
-        .unwrap_or_default();
 
     if session.as_deref().unwrap_or("").is_empty() && event.as_deref().unwrap_or("").is_empty() {
         std::process::exit(0); // nothing useful; never block the agent
     }
-    post_and_exit(&agent, &event.unwrap_or_default(), &session.unwrap_or_default(), &project, &message, &tool);
+    post_and_exit(Payload {
+        agent,
+        event: event.unwrap_or_default(),
+        session: session.unwrap_or_default(),
+        project,
+        message: first_str(&v, &["message"]).unwrap_or_default(),
+        tool: first_str(&v, &["tool_name", "toolName"]).unwrap_or_default(),
+        file: v
+            .get("tool_input")
+            .and_then(|i| i.get("file_path"))
+            .and_then(|x| x.as_str())
+            .unwrap_or_default()
+            .to_string(),
+        desc: v
+            .get("tool_input")
+            .and_then(|i| i.get("description"))
+            .and_then(|x| x.as_str())
+            .unwrap_or_default()
+            .to_string(),
+        transcript: first_str(&v, &["transcript_path", "transcriptPath"]).unwrap_or_default(),
+    });
 }
 
-/// Live-activity text from a tool-use hook (PreToolUse/PostToolUse), used when
-/// the agent sent no explicit message. Mirrors the macOS app's activity
-/// formatter in spirit: prefer the tool's own description, then the file being
-/// touched, then just the tool name.
-fn tool_message(tool: &str, input: Option<&Value>) -> Option<String> {
-    if tool.is_empty() {
-        return None;
+/// `agentpet run [--session id] [--project path] [--agent kind] -- <command...>`
+/// Port of the macOS RunCLI: any CLI agent gets a working session with a 60s
+/// heartbeat, and `done` when the command exits (exit code passed through).
+pub fn run_wrapper(args: &[String]) -> ! {
+    let dashdash = args.iter().position(|a| a == "--");
+    let (flags, command) = match dashdash {
+        Some(i) => (&args[..i], &args[i + 1..]),
+        None => (args, &args[args.len()..]),
+    };
+    if command.is_empty() {
+        eprintln!("usage: agentpet run [--session id] [--project path] [--agent kind] -- <command...>");
+        std::process::exit(2);
     }
-    if let Some(input) = input {
-        if let Some(d) = input.get("description").and_then(|x| x.as_str()) {
-            if !d.is_empty() {
-                return Some(d.to_string());
+
+    let session = flag(flags, "--session").unwrap_or_else(|| {
+        format!("run-{:08x}", std::process::id() as u64 ^ now_millis())
+    });
+    let project = flag(flags, "--project").unwrap_or_else(|| {
+        std::env::current_dir().map(|d| d.to_string_lossy().into_owned()).unwrap_or_default()
+    });
+    let agent = flag(flags, "--agent").unwrap_or_else(|| "cli".into());
+
+    let emit = {
+        let agent = agent.clone();
+        let session = session.clone();
+        let project = project.clone();
+        move |state: &str| {
+            let p = Payload {
+                agent: agent.clone(),
+                event: state.to_string(),
+                session: session.clone(),
+                project: project.clone(),
+                ..Payload::default()
+            };
+            if post(&p.to_json()).is_err() {
+                queue(&p);
             }
         }
-        if let Some(p) = input.get("file_path").and_then(|x| x.as_str()) {
-            if let Some(name) = p.rsplit(['/', '\\']).next().filter(|s| !s.is_empty()) {
-                return Some(format!("{tool} · {name}"));
-            }
+    };
+
+    emit("working");
+
+    // Heartbeat so a long-running agent's session stays fresh.
+    let hb = {
+        let emit = emit.clone();
+        std::thread::spawn(move || loop {
+            std::thread::sleep(std::time::Duration::from_secs(60));
+            emit("working");
+        })
+    };
+    let _ = hb; // detached; process exit ends it
+
+    let status = std::process::Command::new(&command[0])
+        .args(&command[1..])
+        .status();
+
+    emit("done");
+    match status {
+        Ok(s) => std::process::exit(s.code().unwrap_or(0)),
+        Err(_) => {
+            eprintln!("agentpet run: failed to launch {}", command[0]);
+            std::process::exit(126);
         }
     }
-    Some(format!("Using {tool}"))
 }
 
-fn post_and_exit(agent: &str, event: &str, session: &str, project: &str, message: &str, tool: &str) -> ! {
-    let payload = serde_json::json!({
-        "agent": agent, "event": event, "session": session, "project": project,
-        "message": message, "tool": tool,
-    })
-    .to_string();
-    let _ = post(&payload);
+#[derive(Default, Clone)]
+struct Payload {
+    agent: String,
+    event: String,
+    session: String,
+    project: String,
+    message: String,
+    tool: String,
+    file: String,
+    desc: String,
+    transcript: String,
+}
+
+impl Payload {
+    fn to_json(&self) -> String {
+        serde_json::json!({
+            "agent": self.agent, "event": self.event, "session": self.session,
+            "project": self.project, "message": self.message, "tool": self.tool,
+            "file": self.file, "desc": self.desc, "transcript": self.transcript,
+            "ts": now_millis(),
+        })
+        .to_string()
+    }
+}
+
+fn post_and_exit(p: Payload) -> ! {
+    if post(&p.to_json()).is_err() {
+        // App not running , queue the event for replay on next launch.
+        queue(&p);
+    }
     std::process::exit(0);
+}
+
+/// Queue dir shared with the app: %LOCALAPPDATA%/AgentPet/queue (config_dir on
+/// other platforms). One JSON line per file, name-ordered by timestamp.
+pub fn queue_dir() -> Option<std::path::PathBuf> {
+    dirs::config_dir().map(|d| d.join("AgentPet").join("queue"))
+}
+
+fn queue(p: &Payload) {
+    let Some(dir) = queue_dir() else { return };
+    if std::fs::create_dir_all(&dir).is_err() {
+        return;
+    }
+    let name = format!("{}-{}.json", now_millis(), std::process::id());
+    let _ = std::fs::write(dir.join(name), p.to_json());
+}
+
+fn now_millis() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis() as u64)
+        .unwrap_or(0)
 }
 
 fn flag(args: &[String], name: &str) -> Option<String> {

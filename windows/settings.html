@@ -51,12 +51,30 @@
         </div>
 
         <div class="group">
+          <div class="ghead" id="t-sessions">Agents</div>
+          <div class="gcard">
+            <div id="sessions-list"></div>
+            <div class="row" id="sessions-empty"><span class="cap" id="t-no-agents">Nothing running right now.</span></div>
+            <div class="row center" id="sessions-clear-row" style="display:none">
+              <button class="linklike" id="sessions-clear">Clear all</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="group">
           <div class="ghead" id="t-notif">Notifications</div>
           <div class="gcard">
             <label class="row"><span class="rt"><span id="t-notify">Notifications</span>
               <span class="cap" id="t-notify-sub">Alerts when an agent finishes or needs input</span></span>
               <input type="checkbox" id="notify" /></label>
-            <label class="row"><span id="t-sound">Play a sound</span><input type="checkbox" id="sound" /></label>
+          </div>
+        </div>
+
+        <div class="group">
+          <div class="ghead" id="t-sounds">Sounds</div>
+          <div class="gcard">
+            <label class="row"><span id="t-sound-done">When an agent finishes</span><input type="checkbox" id="sound-done" /></label>
+            <label class="row"><span id="t-sound-waiting">When an agent needs input</span><input type="checkbox" id="sound-waiting" /></label>
           </div>
         </div>
 
@@ -112,7 +130,7 @@
       <!-- =============================== BUBBLE ============================== -->
       <div class="page" data-page="bubble">
         <div class="group">
-          <div class="ghead" id="t-bubble2">Bubble</div>
+          <div class="ghead" id="t-appearance">Appearance</div>
           <div class="gcard">
             <div class="row"><span id="t-theme">Theme</span>
               <select id="theme"><option value="dark" id="o-dark">Dark</option><option value="light" id="o-light">Light</option><option value="system" id="o-theme-system">System</option></select></div>
@@ -126,24 +144,103 @@
                 <option value="rounded" id="o-rounded">Rounded</option>
                 <option value="mono" id="o-mono">Monospace</option>
               </select></div>
-            <div class="row"><span id="t-phrases">Activity phrases</span>
-              <select id="phrases">
-                <option value="off" id="o-ph-off">Off</option>
-                <option value="chef" id="o-ph-chef">Chef</option>
-                <option value="wizard" id="o-ph-wizard">Wizard</option>
-                <option value="scientist" id="o-ph-scientist">Scientist</option>
-                <option value="explorer" id="o-ph-explorer">Explorer</option>
-              </select></div>
-            <label class="row"><span id="t-idle">Show idle chatter</span><input type="checkbox" id="idle" /></label>
+            <label class="row"><span class="rt"><span id="t-idle">Show idle message</span>
+              <span class="cap" id="t-idle-sub">The pet's chatter while no agent is running.</span></span>
+              <input type="checkbox" id="idle" /></label>
           </div>
         </div>
 
         <div class="group">
-          <div class="ghead" id="t-messages">Custom messages</div>
+          <div class="ghead" id="t-display">Display</div>
+          <div class="gcard">
+            <div class="row"><span id="t-rows">Rows</span>
+              <select id="bub-mode">
+                <option value="list" id="o-bm-list">All rows</option>
+                <option value="carousel" id="o-bm-carousel">Carousel</option>
+                <option value="compact" id="o-bm-compact">Compact</option>
+              </select></div>
+            <div class="row"><span id="t-grouping">Sessions</span>
+              <select id="bub-grouping">
+                <option value="byKind" id="o-bg-kind">Grouped by agent</option>
+                <option value="all" id="o-bg-all">All sessions</option>
+              </select></div>
+            <div class="row"><span id="t-maxrows">Max rows</span>
+              <span class="slider-wrap"><input type="range" id="bub-max" min="1" max="10" /><span class="val dim" id="bub-max-val"></span></span></div>
+            <div class="row"><span id="t-filter">Include states</span>
+              <select id="bub-filter">
+                <option value="all" id="o-bf-all">All states</option>
+                <option value="doneAndAbove" id="o-bf-done">Done and above</option>
+                <option value="workingAndWaiting" id="o-bf-ww">Working &amp; Waiting</option>
+                <option value="workingOnly" id="o-bf-w">Working only</option>
+              </select></div>
+          </div>
+        </div>
+
+        <div class="group">
+          <div class="ghead" id="t-visible">Visible agents</div>
+          <div class="gcard" id="bub-visible"></div>
+        </div>
+
+        <div class="group">
+          <div class="ghead" id="t-rowcontent">Row content</div>
           <div class="gcard pad">
-            <div class="cap" id="t-msg-help" style="margin-bottom:8px">Custom messages (one per line, leave empty for default)</div>
-            <div class="row tight"><span id="t-msg-agent">For agent</span><select id="msg-agent"></select></div>
-            <div id="msg-editors"></div>
+            <div id="bub-preview" class="bub-preview"></div>
+            <div id="bub-tokens" class="bub-tokens"></div>
+            <div class="row tight"><span class="cap" id="t-presets">Presets</span>
+              <span class="preset-btns">
+                <button data-preset="original" id="t-pr-original">Original</button>
+                <button data-preset="standard" id="t-pr-standard">Standard</button>
+                <button data-preset="detailed" id="t-pr-detailed">Detailed</button>
+              </span></div>
+          </div>
+        </div>
+
+        <div class="group">
+          <div class="ghead" id="t-style">Style</div>
+          <div class="gcard">
+            <div class="row"><span id="t-separator">Separator</span>
+              <select id="bub-sep">
+                <option value="·">·</option>
+                <option value="→">→</option>
+                <option value="|">|</option>
+                <option value=" " id="o-sep-space">space</option>
+              </select></div>
+            <div class="row"><span id="t-dotstyle">State dot</span>
+              <select id="bub-dot">
+                <option value="plain" id="o-dot-plain">Plain dot</option>
+                <option value="claude" id="o-dot-claude">Claude style</option>
+              </select></div>
+          </div>
+        </div>
+
+        <div class="group">
+          <div class="ghead" id="t-activity">Activity messages</div>
+          <div class="gcard">
+            <div class="row"><span id="t-phrases">Vocabulary</span>
+              <select id="phrases">
+                <option value="chef" id="o-ph-chef">👨‍🍳 Chef</option>
+                <option value="engineer" id="o-ph-engineer">⚙️ Engineer</option>
+                <option value="wizard" id="o-ph-wizard">🧙 Wizard</option>
+                <option value="explorer" id="o-ph-explorer">🧭 Explorer</option>
+                <option value="scientist" id="o-ph-scientist">🔬 Scientist</option>
+              </select></div>
+          </div>
+        </div>
+
+        <div class="group">
+          <div class="ghead" id="t-messages">Bubble messages</div>
+          <div class="gcard pad">
+            <div class="row tight"><span id="t-msg-src">Messages</span>
+              <select id="msg-src">
+                <option value="system" id="o-ms-system">System</option>
+                <option value="custom" id="o-ms-custom">Custom</option>
+              </select></div>
+            <div id="msg-custom-wrap">
+              <div class="cap" id="t-msg-help" style="margin: 4px 0 8px">Custom messages (one per line, leave empty for default)</div>
+              <div class="row tight"><span id="t-msg-agent">For agent</span><select id="msg-agent"></select></div>
+              <div id="msg-editors"></div>
+              <div class="row center"><button class="linklike" id="msg-reset">Reset to defaults</button></div>
+            </div>
           </div>
         </div>
       </div>
@@ -187,6 +284,20 @@
         <button data-prev="done" id="t-pv-done">Done</button>
       </div>
     </footer>
+
+    <!-- Codex one-time trust help (the macOS CodexHelpView) -->
+    <div class="modal-backdrop" id="codex-help" hidden>
+      <div class="modal">
+        <h3 id="t-cdx-title">How to connect Codex</h3>
+        <ol class="cap" style="margin: 10px 0 14px 18px; line-height: 1.8">
+          <li id="t-cdx-1">Install the hook here (it also enables hooks in Codex's config.toml).</li>
+          <li id="t-cdx-2">Open Codex CLI and run /hooks.</li>
+          <li id="t-cdx-3">Press t to Trust the AgentPet hook.</li>
+          <li id="t-cdx-4">Quit and reopen Codex (both the CLI and the desktop app).</li>
+        </ol>
+        <button class="prominent" id="codex-help-close">OK</button>
+      </div>
+    </div>
 
     <script type="module" src="/src/settings.ts"></script>
   </body>

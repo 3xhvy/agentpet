@@ -1,10 +1,13 @@
-// Renders + animates a pet spritesheet on a canvas. Sheets are an 8x9 grid:
-// 8 animation frames per row, 9 rows (one per state). We pick the row by the
-// pet's current state and loop the 8 frames. drawImage of a sub-rectangle , no
-// pixel reads , so cross-origin CDN images work without tainting.
+// Renders + animates a pet spritesheet on a canvas. Sheets are sliced with
+// alpha-gutter detection (a port of the macOS app's SpriteSlicer): transparent
+// gaps split the sheet into rows, then each row into frames. That way empty
+// cells in a row simply don't exist , the pet never blinks out on sparse rows,
+// and ragged/AI-generated sheets slice correctly. Falls back to a fixed 8x9
+// grid when pixels can't be read (no CORS).
 
 const COLS = 8;
 const ROWS = 9;
+const ALPHA_THRESHOLD = 16;
 
 // Row index per state, matching the macOS app's spritesheet layout:
 // 0 Idle, 1 RunRight, 2 RunLeft, 3 Waving, 4 Jumping, 5 Failed, 6 Waiting, 7 Running, 8 Review
@@ -13,41 +16,137 @@ const STATE_ROW: Record<string, number> = {
   registered: 0,
   working: 7,
   waiting: 6,
-  done: 4,
+  done: 3,       // waving goodbye to the finished task
+  celebrate: 4,  // jumping , the 3s burst when all work completes
 };
+
+// Frame rate varies by mood (faster while working), like the macOS app.
+const STATE_FPS: Record<string, number> = {
+  working: 8,
+  celebrate: 8,
+  waiting: 4,
+  done: 3,
+  idle: 3,
+  registered: 3,
+};
+
+interface Rect { x: number; y: number; w: number; h: number }
+
+/// Contiguous runs of `true` in an occupancy array → [start, end) pairs.
+function segments(occ: Uint8Array): Array<[number, number]> {
+  const out: Array<[number, number]> = [];
+  let start = -1;
+  for (let i = 0; i < occ.length; i++) {
+    if (occ[i] && start < 0) start = i;
+    else if (!occ[i] && start >= 0) { out.push([start, i]); start = -1; }
+  }
+  if (start >= 0) out.push([start, occ.length]);
+  return out;
+}
+
+/// Alpha-gutter slice: rows by transparent bands, then frames within each row.
+function slice(img: HTMLImageElement): Rect[][] {
+  const w = img.naturalWidth, h = img.naturalHeight;
+  if (!w || !h) return [];
+  const cv = document.createElement("canvas");
+  cv.width = w; cv.height = h;
+  const ctx = cv.getContext("2d", { willReadFrequently: true });
+  if (!ctx) return [];
+  ctx.drawImage(img, 0, 0);
+  let data: Uint8ClampedArray;
+  try {
+    data = ctx.getImageData(0, 0, w, h).data;
+  } catch {
+    return []; // tainted (no CORS) , caller falls back to the fixed grid
+  }
+  const rowHas = new Uint8Array(h);
+  for (let y = 0; y < h; y++) {
+    const off = y * w * 4;
+    for (let x = 0; x < w; x++) {
+      if (data[off + x * 4 + 3] > ALPHA_THRESHOLD) { rowHas[y] = 1; break; }
+    }
+  }
+  const clips: Rect[][] = [];
+  for (const [y0, y1] of segments(rowHas)) {
+    const colHas = new Uint8Array(w);
+    for (let y = y0; y < y1; y++) {
+      const off = y * w * 4;
+      for (let x = 0; x < w; x++) {
+        if (data[off + x * 4 + 3] > ALPHA_THRESHOLD) colHas[x] = 1;
+      }
+    }
+    const clip = segments(colHas).map(([x0, x1]) => ({ x: x0, y: y0, w: x1 - x0, h: y1 - y0 }));
+    if (clip.length) clips.push(clip);
+  }
+  return clips;
+}
 
 export class Pet {
   private ctx: CanvasRenderingContext2D;
   private img = new Image();
   private loaded = false;
+  private clips: Rect[][] = [];
   private frame = 0;
   private row = 0;
   private lastTick = 0;
-  private readonly fps = 8;
+  private fps = 3;
+  /// Unused space above the sprite, as a fraction of canvas height. The bubble
+  /// uses it to sit right above the pet's head instead of the canvas top.
+  headroom = 0;
 
   constructor(private canvas: HTMLCanvasElement) {
     const c = canvas.getContext("2d");
     if (!c) throw new Error("no 2d context");
     this.ctx = c;
     this.ctx.imageSmoothingEnabled = false;
-    this.img.onload = () => { this.loaded = true; };
     requestAnimationFrame((t) => this.loop(t));
   }
 
   load(spritesheetUrl: string) {
     this.loaded = false;
-    this.img.src = spritesheetUrl;
+    const img = new Image();
+    img.crossOrigin = "anonymous"; // CDN sends CORS , lets us read alpha
+    img.onload = () => {
+      this.img = img;
+      this.clips = slice(img);
+      this.frame = 0;
+      this.loaded = true;
+    };
+    // A pre-CORS cached copy makes the crossOrigin load fail , retry plain
+    // (displayable, but slicing falls back to the fixed grid).
+    img.onerror = () => {
+      const plain = new Image();
+      plain.onload = () => {
+        this.img = plain;
+        this.clips = [];
+        this.frame = 0;
+        this.loaded = true;
+      };
+      plain.src = spritesheetUrl;
+    };
+    // Cache-bust http(s) URLs so the request actually carries CORS headers
+    // instead of replaying a cached non-CORS response.
+    img.src = spritesheetUrl.startsWith("data:")
+      ? spritesheetUrl
+      : spritesheetUrl + (spritesheetUrl.includes("?") ? "&" : "?") + "cors=1";
   }
 
   setState(state: string) {
+    this.fps = STATE_FPS[state] ?? 3;
     const row = STATE_ROW[state] ?? 0;
     if (row !== this.row) { this.row = row; this.frame = 0; }
+  }
+
+  /// The frames of the current row (clamped to what the sheet actually has).
+  private currentClip(): Rect[] | null {
+    if (!this.clips.length) return null;
+    return this.clips[Math.min(this.row, this.clips.length - 1)];
   }
 
   private loop(t: number) {
     if (this.loaded && t - this.lastTick > 1000 / this.fps) {
       this.lastTick = t;
-      this.frame = (this.frame + 1) % COLS;
+      this.frame++;
       this.draw();
     }
     requestAnimationFrame((n) => this.loop(n));
@@ -56,18 +155,25 @@ export class Pet {
   private draw() {
     const { width: W, height: H } = this.canvas;
     this.ctx.clearRect(0, 0, W, H);
-    const fw = this.img.naturalWidth / COLS;
-    const fh = this.img.naturalHeight / ROWS;
-    if (!fw || !fh) return;
-    // Fit the frame into the canvas, anchored to the bottom. Snap to an integer
-    // scale so pixel-art stays crisp (no shimmering edges from fractional zoom).
-    const fit = Math.min(W / fw, H / fh);
+
+    let r: Rect;
+    const clip = this.currentClip();
+    if (clip) {
+      r = clip[this.frame % clip.length];
+    } else {
+      // Fallback: fixed 8x9 grid (pixels unreadable , e.g. no CORS).
+      const fw = this.img.naturalWidth / COLS;
+      const fh = this.img.naturalHeight / ROWS;
+      if (!fw || !fh) return;
+      r = { x: (this.frame % COLS) * fw, y: Math.min(this.row, ROWS - 1) * fh, w: fw, h: fh };
+    }
+
+    // Fit into the canvas, anchored bottom-center; snap to an integer scale so
+    // pixel-art stays crisp (no shimmering edges from fractional zoom).
+    const fit = Math.min(W / r.w, H / r.h);
     const s = fit >= 1 ? Math.floor(fit) : fit;
-    const dw = fw * s, dh = fh * s;
-    this.ctx.drawImage(
-      this.img,
-      this.frame * fw, this.row * fh, fw, fh,
-      (W - dw) / 2, H - dh, dw, dh
-    );
+    const dw = r.w * s, dh = r.h * s;
+    this.headroom = (H - dh) / H;
+    this.ctx.drawImage(this.img, r.x, r.y, r.w, r.h, (W - dw) / 2, H - dh, dw, dh);
   }
 }

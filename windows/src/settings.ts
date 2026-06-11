@@ -1,10 +1,13 @@
 import { invoke } from "@tauri-apps/api/core";
-import { emit } from "@tauri-apps/api/event";
+import { emit, listen } from "@tauri-apps/api/event";
 import { getVersion } from "@tauri-apps/api/app";
 import { exit } from "@tauri-apps/plugin-process";
 import { enable, disable, isEnabled } from "@tauri-apps/plugin-autostart";
 import { loadCatalog, savedSlug, saveSlug, type Pet } from "./catalog";
 import { t, getLang, setLang, type Lang } from "./i18n";
+import { SessionStore, basename, type AgentEventPayload, type Session } from "./state";
+import { agentIconUrl } from "./icons";
+import { LAYOUT_PRESETS, readBubbleConfig, elapsedString, type TokenItem, type BubbleToken } from "./bubble";
 
 // ------------------------------------------------------------------ tabs ----
 function initTabs() {
@@ -43,12 +46,25 @@ function renderAgents() {
 
     const meta = document.createElement("div");
     meta.className = "meta";
-    const status = a.note
+    // Codex needs a one-time trust after install (mac shows it in orange).
+    const status = a.kind === "codex" && a.installed
+      ? `<div class="note warn">${esc(t("Installed , needs a one-time trust (tap ?)"))}</div>`
+      : a.note
       ? `<div class="note">${esc(t(a.note))}</div>`
       : a.installed
       ? `<div class="ok">${esc(t("Hook installed"))}</div>`
       : "";
     meta.innerHTML = `<div class="name">${esc(a.display_name)}</div>${status}`;
+    row.appendChild(meta);
+
+    if (a.kind === "codex") {
+      const help = document.createElement("button");
+      help.className = "help-btn";
+      help.textContent = "?";
+      help.title = t("How to connect Codex");
+      help.onclick = () => { (document.getElementById("codex-help") as HTMLElement).hidden = false; };
+      row.appendChild(help);
+    }
 
     const btn = document.createElement("button");
     btn.textContent = a.installed ? t("Remove") : t("Install");
@@ -58,11 +74,69 @@ function renderAgents() {
       try { await invoke("toggle_install", { kind: a.kind }); } catch (e) { alert(String(e)); }
       await loadAgents();
     };
-
-    row.appendChild(meta);
     row.appendChild(btn);
     agentsRoot.appendChild(row);
   }
+}
+
+// ------------------------------------------------------------- sessions ----
+// Live agent list (the macOS menu bar popover's Agents section): dot, project,
+// activity, live elapsed, hover ✕ to dismiss, Clear all.
+const sessionStore = new SessionStore();
+
+function initSessions() {
+  const list = document.getElementById("sessions-list")!;
+  const empty = document.getElementById("sessions-empty")!;
+  const clearRow = document.getElementById("sessions-clear-row")!;
+  (document.getElementById("sessions-clear") as HTMLButtonElement).onclick = () => {
+    sessionStore.clear();
+    emit("sessions-clear", null);
+    paint();
+  };
+
+  function paint() {
+    const sessions = sessionStore.active().filter((s) => s.state !== "idle" && s.state !== "registered");
+    empty.style.display = sessions.length ? "none" : "";
+    clearRow.style.display = sessions.length ? "" : "none";
+    list.innerHTML = "";
+    for (const s of sessions) {
+      const row = document.createElement("div");
+      row.className = "sess-row";
+      row.dataset.state = s.state;
+      const icon = agentIconUrl(s.agent);
+      row.innerHTML =
+        `<span class="sess-dot"></span>` +
+        (icon ? `<img class="sess-icon" src="${icon}" alt="">` : "") +
+        `<span class="sess-meta"><span class="sess-name">${esc(s.project ? basename(s.project) : s.session)}</span>` +
+        `<span class="sess-sub">${esc(s.title || s.live || t(s.state.charAt(0).toUpperCase() + s.state.slice(1)))}</span></span>` +
+        `<span class="sess-time" data-since="${s.stateSince}">${elapsedString(s.stateSince)}</span>`;
+      const x = document.createElement("button");
+      x.className = "sess-x";
+      x.textContent = "✕";
+      x.title = t("Dismiss");
+      x.onclick = () => {
+        const key = `${s.agent}:${s.session}`;
+        sessionStore.removeKey(key);
+        emit("session-dismiss", key);
+        paint();
+      };
+      row.appendChild(x);
+      list.appendChild(row);
+    }
+  }
+
+  listen<AgentEventPayload>("agent-event", (e) => { sessionStore.update(e.payload); paint(); });
+  listen<string>("agent-end", (e) => { sessionStore.remove(e.payload); paint(); });
+  // Catch up on sessions that started before this window opened.
+  listen<Session>("session-snapshot", (e) => { sessionStore.seed(e.payload); paint(); });
+  emit("sessions-request", null);
+  setInterval(() => {
+    paint();
+    list.querySelectorAll<HTMLElement>(".sess-time[data-since]").forEach((el) => {
+      el.textContent = elapsedString(Number(el.dataset.since));
+    });
+  }, 2000);
+  paint();
 }
 
 // ------------------------------------------------------------------ pet ----
@@ -176,7 +250,8 @@ async function initPet() {
 
 // ---------------------------------------------------------------- bubble ----
 const MSG_STATES: [string, string][] = [
-  ["working", "Working"], ["waiting", "Needs you"], ["done", "Done"], ["idle", "Idle"],
+  ["working", "Working"], ["waiting", "Needs you"], ["done", "Done"],
+  ["celebrate", "Celebrate"], ["idle", "Idle"],
 ];
 const MSG_AGENTS: [string, string][] = [
   ["all", "All agents"], ["claude", "Claude Code"], ["codex", "Codex"], ["gemini", "Gemini CLI"],
@@ -219,7 +294,7 @@ function initBubble() {
       const lbl = document.createElement("div");
       lbl.className = "msg-label";
       lbl.dataset.label = label;
-      lbl.textContent = t(label);
+      lbl.textContent = t(label) + (st === "working" ? ` ${t("(blank = live activity)")}` : "");
       const ta = document.createElement("textarea");
       const key = `ap_msg_${agent}_${st}`;
       ta.value = localStorage.getItem(key) || "";
@@ -232,13 +307,128 @@ function initBubble() {
   msgAgent.onchange = () => build(msgAgent.value);
   build("all");
 
+  // System/custom source + reset, like the macOS BubbleMessages.
+  const src = document.getElementById("msg-src") as HTMLSelectElement;
+  const customWrap = document.getElementById("msg-custom-wrap") as HTMLElement;
+  const syncSrc = () => { customWrap.style.display = src.value === "custom" ? "" : "none"; };
+  src.value = localStorage.getItem("ap_msg_src") || "system";
+  syncSrc();
+  src.onchange = () => { localStorage.setItem("ap_msg_src", src.value); syncSrc(); changed(); };
+  (document.getElementById("msg-reset") as HTMLButtonElement).onclick = () => {
+    for (const [st] of MSG_STATES) localStorage.removeItem(`ap_msg_${msgAgent.value}_${st}`);
+    build(msgAgent.value);
+    changed();
+  };
+
   const phrases = document.getElementById("phrases") as HTMLSelectElement;
-  phrases.value = localStorage.getItem("ap_theme_phrases") || "off";
+  const savedTheme = localStorage.getItem("ap_theme_phrases") || "chef";
+  phrases.value = savedTheme === "off" ? "chef" : savedTheme; // pre-port "off" → chef
   phrases.onchange = () => { localStorage.setItem("ap_theme_phrases", phrases.value); changed(); };
 
   const idle = document.getElementById("idle") as HTMLInputElement;
   idle.checked = localStorage.getItem("ap_idle") !== "0";
-  idle.onchange = () => localStorage.setItem("ap_idle", idle.checked ? "1" : "0");
+  idle.onchange = () => { localStorage.setItem("ap_idle", idle.checked ? "1" : "0"); changed(); };
+}
+
+// -------------------------------------------------- bubble display + layout ----
+function initBubbleDisplay() {
+  const changed = () => { emit("bubble-changed", null); };
+  const bind = (id: string, key: string, dflt: string) => {
+    const el = document.getElementById(id) as HTMLSelectElement;
+    el.value = localStorage.getItem(key) || dflt;
+    el.onchange = () => { localStorage.setItem(key, el.value); changed(); paintPreview(); };
+  };
+  bind("bub-mode", "ap_bub_mode", "carousel");
+  bind("bub-grouping", "ap_bub_grouping", "byKind");
+  bind("bub-filter", "ap_bub_filter", "all");
+  bind("bub-sep", "ap_bub_sep", "·");
+  bind("bub-dot", "ap_bub_dot", "plain");
+
+  const max = document.getElementById("bub-max") as HTMLInputElement;
+  max.value = localStorage.getItem("ap_bub_max") || "5";
+  max.oninput = () => { localStorage.setItem("ap_bub_max", max.value); changed(); };
+
+  // Visible agents (hiddenKinds).
+  const visRoot = document.getElementById("bub-visible")!;
+  const hidden = new Set<string>(JSON.parse(localStorage.getItem("ap_bub_hidden") || "[]"));
+  for (const [kind, name] of MSG_AGENTS.slice(1)) {
+    const row = document.createElement("label");
+    row.className = "row";
+    const span = document.createElement("span");
+    span.textContent = name;
+    const box = document.createElement("input");
+    box.type = "checkbox";
+    box.checked = !hidden.has(kind);
+    box.onchange = () => {
+      if (box.checked) hidden.delete(kind); else hidden.add(kind);
+      localStorage.setItem("ap_bub_hidden", JSON.stringify([...hidden]));
+      changed();
+    };
+    row.appendChild(span);
+    row.appendChild(box);
+    visRoot.appendChild(row);
+  }
+
+  // Row content: token toggles in order + presets + live preview.
+  const tokensRoot = document.getElementById("bub-tokens")!;
+  const readTokens = (): TokenItem[] => readBubbleConfig().tokens;
+  const saveTokens = (tokens: TokenItem[]) => {
+    localStorage.setItem("ap_bub_tokens", JSON.stringify(tokens));
+    changed();
+    paintTokens();
+    paintPreview();
+  };
+  const TOKEN_NAMES: Record<BubbleToken, string> = {
+    dot: "State dot", icon: "Agent icon", title: "Chat title", project: "Project folder",
+    separator: "Separator", message: "Activity message", stateLabel: "State label", elapsed: "Elapsed time",
+  };
+  function paintTokens() {
+    tokensRoot.innerHTML = "";
+    for (const item of readTokens()) {
+      const chip = document.createElement("button");
+      chip.className = "tok-chip" + (item.isVisible ? " on" : "");
+      chip.textContent = t(TOKEN_NAMES[item.token]);
+      chip.onclick = () => {
+        const tokens = readTokens().map((x) =>
+          x.token === item.token ? { ...x, isVisible: !x.isVisible } : x);
+        saveTokens(tokens);
+      };
+      tokensRoot.appendChild(chip);
+    }
+  }
+  document.querySelectorAll<HTMLButtonElement>(".preset-btns button").forEach((b) => {
+    b.onclick = () => saveTokens(LAYOUT_PRESETS[b.dataset.preset!]);
+  });
+
+  // Mock preview row (mac BubbleRowPreview).
+  const preview = document.getElementById("bub-preview")!;
+  function paintPreview() {
+    const cfg = readBubbleConfig();
+    preview.innerHTML = "";
+    const row = document.createElement("div");
+    row.className = "pv-row";
+    for (const item of cfg.tokens) {
+      if (!item.isVisible) continue;
+      switch (item.token) {
+        case "dot": { const d = document.createElement("span"); d.className = "pv-dot"; row.appendChild(d); break; }
+        case "icon": {
+          const img = document.createElement("img");
+          img.className = "aicon"; img.src = agentIconUrl("claude") || ""; row.appendChild(img); break;
+        }
+        case "title": { const s = document.createElement("span"); s.className = "pv-strong"; s.textContent = "Fix login bug"; row.appendChild(s); break; }
+        case "project": { const s = document.createElement("span"); s.className = "pv-strong"; s.textContent = "agentpet"; row.appendChild(s); break; }
+        case "separator": { const s = document.createElement("span"); s.className = "pv-dim"; s.textContent = cfg.separator; row.appendChild(s); break; }
+        case "message": { const s = document.createElement("span"); s.textContent = "Editing SettingsModel.swift"; row.appendChild(s); break; }
+        case "stateLabel": { const s = document.createElement("span"); s.className = "pv-dim"; s.textContent = t("Working"); row.appendChild(s); break; }
+        case "elapsed": { const s = document.createElement("span"); s.className = "pv-dim"; s.textContent = "3m"; row.appendChild(s); break; }
+      }
+    }
+    if (!row.childElementCount) { row.textContent = t("(empty)"); row.classList.add("pv-dim"); }
+    preview.appendChild(row);
+  }
+
+  paintTokens();
+  paintPreview();
 }
 
 // ----------------------------------------------- pet size / fx / import ----
@@ -291,9 +481,17 @@ function initNotify() {
   const box = document.getElementById("notify") as HTMLInputElement;
   box.checked = localStorage.getItem("ap_notify") !== "0";
   box.addEventListener("change", () => localStorage.setItem("ap_notify", box.checked ? "1" : "0"));
-  const snd = document.getElementById("sound") as HTMLInputElement;
-  snd.checked = localStorage.getItem("ap_sound") !== "0";
-  snd.addEventListener("change", () => localStorage.setItem("ap_sound", snd.checked ? "1" : "0"));
+  // Per-event sound toggles (mac SoundSettings); legacy ap_sound seeds both.
+  const legacyOff = localStorage.getItem("ap_sound") === "0";
+  for (const ev of ["done", "waiting"] as const) {
+    const el = document.getElementById(`sound-${ev}`) as HTMLInputElement;
+    const key = `ap_sound_${ev}`;
+    el.checked = (localStorage.getItem(key) ?? (legacyOff ? "0" : "1")) !== "0";
+    el.addEventListener("change", () => localStorage.setItem(key, el.checked ? "1" : "0"));
+  }
+  (document.getElementById("codex-help-close") as HTMLButtonElement).onclick = () => {
+    (document.getElementById("codex-help") as HTMLElement).hidden = true;
+  };
 }
 
 // --------------------------------------------------------------- startup ----
@@ -323,7 +521,12 @@ function applyStatic() {
   set("t-notif", "Notifications");
   set("t-notify", "Notifications");
   set("t-notify-sub", "Alerts when an agent finishes or needs input");
-  set("t-sound", "Play a sound");
+  set("t-sessions", "Agents");
+  set("t-no-agents", "Nothing running right now.");
+  set("sessions-clear", "Clear all");
+  set("t-sounds", "Sounds");
+  set("t-sound-done", "When an agent finishes");
+  set("t-sound-waiting", "When an agent needs input");
   set("t-agents", "Agent integrations");
   set("t-app", "App");
   set("t-version", "Version");
@@ -337,7 +540,7 @@ function applyStatic() {
   set("t-petsize", "Pet size");
   set("t-fx", "Idle bobbing animation");
   // bubble
-  set("t-bubble2", "Bubble");
+  set("t-appearance", "Appearance");
   set("t-theme", "Theme");
   set("t-opacity", "Opacity");
   set("t-fontsize", "Text size");
@@ -348,16 +551,49 @@ function applyStatic() {
   set("o-system", "System");
   set("o-rounded", "Rounded");
   set("o-mono", "Monospace");
-  set("t-phrases", "Activity phrases");
-  set("o-ph-off", "Off");
-  set("o-ph-chef", "Chef");
-  set("o-ph-wizard", "Wizard");
-  set("o-ph-scientist", "Scientist");
-  set("o-ph-explorer", "Explorer");
-  set("t-idle", "Show idle chatter");
-  set("t-messages", "Custom messages");
+  set("t-idle", "Show idle message");
+  set("t-idle-sub", "The pet's chatter while no agent is running.");
+  set("t-display", "Display");
+  set("t-rows", "Rows");
+  set("o-bm-list", "All rows");
+  set("o-bm-carousel", "Carousel");
+  set("o-bm-compact", "Compact");
+  set("t-grouping", "Sessions");
+  set("o-bg-kind", "Grouped by agent");
+  set("o-bg-all", "All sessions");
+  set("t-maxrows", "Max rows");
+  set("t-filter", "Include states");
+  set("o-bf-all", "All states");
+  set("o-bf-done", "Done and above");
+  set("o-bf-ww", "Working & Waiting");
+  set("o-bf-w", "Working only");
+  set("t-visible", "Visible agents");
+  set("t-rowcontent", "Row content");
+  set("t-presets", "Presets");
+  set("t-pr-original", "Original");
+  set("t-pr-standard", "Standard");
+  set("t-pr-detailed", "Detailed");
+  set("t-style", "Style");
+  set("t-separator", "Separator");
+  set("o-sep-space", "space");
+  set("t-dotstyle", "State dot");
+  set("o-dot-plain", "Plain dot");
+  set("o-dot-claude", "Claude style");
+  set("t-activity", "Activity messages");
+  set("t-phrases", "Vocabulary");
+  set("t-messages", "Bubble messages");
+  set("t-msg-src", "Messages");
+  set("o-ms-system", "System");
+  set("o-ms-custom", "Custom");
+  set("msg-reset", "Reset to defaults");
   set("t-msg-help", "Custom messages (one per line, leave empty for default)");
   set("t-msg-agent", "For agent");
+  // codex help
+  set("t-cdx-title", "How to connect Codex");
+  set("t-cdx-1", "Install the hook here (it also enables hooks in Codex's config.toml).");
+  set("t-cdx-2", "Open Codex CLI and run /hooks.");
+  set("t-cdx-3", "Press t to Trust the AgentPet hook.");
+  set("t-cdx-4", "Quit and reopen Codex (both the CLI and the desktop app).");
   const allOpt = document.querySelector<HTMLOptionElement>('#msg-agent option[value="all"]');
   if (allOpt) allOpt.textContent = t("All agents");
   document.querySelectorAll<HTMLElement>(".msg-label").forEach((el) => {
@@ -435,6 +671,8 @@ loadAgents();
 initPet();
 initPetControls();
 initBubble();
+initBubbleDisplay();
+initSessions();
 initPreview();
 initNotify();
 initAutostart();

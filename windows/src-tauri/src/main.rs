@@ -8,5 +8,10 @@ fn main() {
         agentpet_lib::cli::run_hook(&args[2..]);
         return;
     }
+    // `agentpet run [--session id] [--project path] [--agent kind] -- <cmd...>`:
+    // wraps any CLI agent , working while it runs, done when it exits.
+    if args.get(1).map(String::as_str) == Some("run") {
+        agentpet_lib::cli::run_wrapper(&args[2..]);
+    }
     agentpet_lib::run();
 }

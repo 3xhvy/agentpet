@@ -2,6 +2,7 @@ pub mod cli;
 pub mod hooks;
 pub mod server;
 pub mod statemap;
+pub mod transcript;
 
 use std::sync::Mutex;
 use std::time::Duration;
@@ -11,8 +12,10 @@ use tauri::{Manager, PhysicalPosition, WebviewUrl, WebviewWindowBuilder};
 
 /// Tray menu items kept around so the language switcher can re-label them live.
 struct TrayItems {
+    show_pet: tauri::menu::CheckMenuItem<tauri::Wry>,
     settings: MenuItem<tauri::Wry>,
     quit: MenuItem<tauri::Wry>,
+    tray: tauri::tray::TrayIcon<tauri::Wry>,
 }
 
 /// The pet's opaque region in physical pixels, relative to the window's top-left.
@@ -89,11 +92,11 @@ fn write_lang(code: &str) {
 }
 
 /// Localised tray labels (the only app text on the Rust side).
-fn tray_labels(code: &str) -> (&'static str, &'static str) {
+fn tray_labels(code: &str) -> (&'static str, &'static str, &'static str) {
     match code {
-        "vi" => ("Cài đặt", "Thoát AgentPet"),
-        "zh" => ("设置", "退出 AgentPet"),
-        _ => ("Settings", "Quit AgentPet"),
+        "vi" => ("Hiện pet", "Cài đặt", "Thoát AgentPet"),
+        "zh" => ("显示宠物", "设置", "退出 AgentPet"),
+        _ => ("Show pet", "Settings", "Quit AgentPet"),
     }
 }
 
@@ -150,11 +153,50 @@ fn open_url(url: String) {
 #[tauri::command]
 fn set_lang(app: tauri::AppHandle, code: String) {
     write_lang(&code);
-    let (s, q) = tray_labels(&code);
+    let (p, s, q) = tray_labels(&code);
     if let Some(items) = app.try_state::<Mutex<TrayItems>>() {
         if let Ok(it) = items.lock() {
+            let _ = it.show_pet.set_text(p);
             let _ = it.settings.set_text(s);
             let _ = it.quit.set_text(q);
+        }
+    }
+}
+
+/// Live agent counts from the pet window → tray tooltip (the macOS app shows
+/// the count next to the menu bar icon; the Windows tray equivalent).
+#[tauri::command]
+fn set_tray_status(app: tauri::AppHandle, working: u32, waiting: u32) {
+    if let Some(items) = app.try_state::<Mutex<TrayItems>>() {
+        if let Ok(it) = items.lock() {
+            let tip = if waiting > 0 {
+                format!("AgentPet , {waiting} waiting for you")
+            } else if working > 0 {
+                format!("AgentPet , {working} working")
+            } else {
+                "AgentPet".to_string()
+            };
+            let _ = it.tray.set_tooltip(Some(tip));
+        }
+    }
+}
+
+/// Show/hide the pet overlay (tray toggle , the macOS "Show pet" switch).
+#[tauri::command]
+fn set_pet_visible(app: tauri::AppHandle, visible: bool) {
+    if let Some(win) = app.get_webview_window("pet") {
+        if visible {
+            let _ = win.show();
+        } else {
+            let _ = win.hide();
+        }
+    }
+    if let Some(p) = dirs::config_dir().map(|d| d.join("AgentPet").join("petvisible")) {
+        let _ = std::fs::write(p, if visible { "1" } else { "0" });
+    }
+    if let Some(items) = app.try_state::<Mutex<TrayItems>>() {
+        if let Ok(it) = items.lock() {
+            let _ = it.show_pet.set_checked(visible);
         }
     }
 }
@@ -182,6 +224,8 @@ pub fn run() {
             open_settings,
             open_url,
             set_lang,
+            set_tray_status,
+            set_pet_visible,
             set_hit_rect
         ])
         .setup(|app| {
@@ -268,18 +312,28 @@ pub fn run() {
             // Tray menu , the pet window is frameless, so this is how you reach
             // Settings or quit the app. Labels start in the saved language; the
             // Settings switcher re-labels them live via the `set_lang` command.
-            let (s_lbl, q_lbl) = tray_labels(&read_lang());
+            let (p_lbl, s_lbl, q_lbl) = tray_labels(&read_lang());
+            let pet_visible = dirs::config_dir()
+                .map(|d| d.join("AgentPet").join("petvisible"))
+                .and_then(|p| std::fs::read_to_string(p).ok())
+                .map(|s| s.trim() != "0")
+                .unwrap_or(true);
+            let show_pet_i = tauri::menu::CheckMenuItem::with_id(
+                app, "show_pet", p_lbl, true, pet_visible, None::<&str>)?;
             let settings_i = MenuItem::with_id(app, "settings", s_lbl, true, None::<&str>)?;
             let quit_i = MenuItem::with_id(app, "quit", q_lbl, true, None::<&str>)?;
-            let menu = Menu::with_items(app, &[&settings_i, &quit_i])?;
-            app.manage(Mutex::new(TrayItems {
-                settings: settings_i.clone(),
-                quit: quit_i.clone(),
-            }));
+            let menu = Menu::with_items(app, &[&show_pet_i, &settings_i, &quit_i])?;
             let mut tray = TrayIconBuilder::new()
                 .tooltip("AgentPet")
                 .menu(&menu)
                 .on_menu_event(|app, event| match event.id.as_ref() {
+                    "show_pet" => {
+                        let now_visible = app
+                            .get_webview_window("pet")
+                            .and_then(|w| w.is_visible().ok())
+                            .unwrap_or(true);
+                        set_pet_visible(app.clone(), !now_visible);
+                    }
                     "settings" => open_settings(app.clone()),
                     "quit" => app.exit(0),
                     _ => {}
@@ -287,7 +341,18 @@ pub fn run() {
             if let Some(icon) = app.default_window_icon() {
                 tray = tray.icon(icon.clone());
             }
-            let _tray = tray.build(app)?;
+            let tray = tray.build(app)?;
+            app.manage(Mutex::new(TrayItems {
+                show_pet: show_pet_i.clone(),
+                settings: settings_i.clone(),
+                quit: quit_i.clone(),
+                tray,
+            }));
+            if !pet_visible {
+                if let Some(win) = app.get_webview_window("pet") {
+                    let _ = win.hide();
+                }
+            }
 
             // First run: open Settings so the user knows to pick a pet and
             // connect an agent (otherwise the pet just sits there silently).

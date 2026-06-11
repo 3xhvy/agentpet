@@ -1,11 +1,12 @@
-import { listen } from "@tauri-apps/api/event";
+import { listen, emit } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { Pet } from "./pet";
-import { SessionStore } from "./state";
+import { SessionStore, aggregateMood, basename, type AgentEventPayload } from "./state";
+import { BubbleRenderer } from "./bubble";
 import { loadCatalog, savedSlug, saveSlug } from "./catalog";
 import { t, setLang, type Lang } from "./i18n";
-import { themePhrase } from "./activity";
+import { bubbleLines } from "./activity";
 import { sendNotification, isPermissionGranted, requestPermission } from "@tauri-apps/plugin-notification";
 import { check } from "@tauri-apps/plugin-updater";
 import { relaunch } from "@tauri-apps/plugin-process";
@@ -21,33 +22,13 @@ import { relaunch } from "@tauri-apps/plugin-process";
   } catch {}
 })();
 
-function msgFor(state: string, seed: string, agent: string | undefined, live: string): string {
-  const custom = customLine(state, seed, agent);
-  if (custom) return custom;
-  const theme = localStorage.getItem("ap_theme_phrases") || "off";
-  if (theme !== "off") {
-    const p = themePhrase(theme, state, seed);
-    if (p) return p;
-  }
-  return live || t(STATE_LABEL[state] ?? "");
-}
-
 const canvas = document.getElementById("pet") as HTMLCanvasElement;
-const bubble = document.getElementById("bubble") as HTMLDivElement;
+const bubbleEl = document.getElementById("bubble") as HTMLDivElement;
 const pet = new Pet(canvas);
 const store = new SessionStore();
+const bubble = new BubbleRenderer(bubbleEl);
 
-const IDLE_LINES = [
-  "Let's grill some bugs.",
-  "Tiny commit, tiny dopamine.",
-  "The build is quiet. Too quiet.",
-  "Ship something small.",
-];
-const STATE_LABEL: Record<string, string> = {
-  working: "Working", waiting: "Needs you", done: "Done", registered: "Ready", idle: "Idle",
-};
-
-// --- bubble customization (theme / opacity / custom messages) ----------------
+// --- bubble appearance (theme / opacity / fonts) ------------------------------
 const FONT_FAMILIES: Record<string, string> = {
   system: '"Segoe UI", system-ui, sans-serif',
   rounded: '"Segoe UI Rounded", "Nunito", "Segoe UI", sans-serif',
@@ -81,40 +62,28 @@ function applyPet() {
   canvas.style.height = `${Math.round(180 * size)}px`;
   canvas.classList.toggle("bob", localStorage.getItem("ap_fx") !== "0");
 }
+applyPet();
 
-// Simple synthesized chimes (no audio assets needed).
+// Simple synthesized chimes (no audio assets needed). Per-event enable, like
+// the macOS SoundSettings (done = high glass-ish, waiting = lower submarine).
 let audioCtx: AudioContext | null = null;
-function beep(freq: number) {
-  if (localStorage.getItem("ap_sound") === "0") return;
+function chime(event: "done" | "waiting") {
+  const key = event === "done" ? "ap_sound_done" : "ap_sound_waiting";
+  const legacy = localStorage.getItem("ap_sound"); // pre-split toggle
+  const enabled = localStorage.getItem(key) ?? (legacy === "0" ? "0" : "1");
+  if (enabled === "0") return;
   try {
     audioCtx = audioCtx || new AudioContext();
     const o = audioCtx.createOscillator();
     const g = audioCtx.createGain();
     o.type = "sine";
-    o.frequency.value = freq;
+    o.frequency.value = event === "done" ? 880 : 560;
     g.gain.value = 0.05;
     o.connect(g);
     g.connect(audioCtx.destination);
     o.start();
     o.stop(audioCtx.currentTime + 0.13);
   } catch {}
-}
-applyPet();
-
-// A stable custom line for a state (seeded by session id). Per-agent overrides
-// the "all" set; returns null when nothing custom is set (use the default).
-function customLine(state: string, seed: string, agent?: string): string | null {
-  const keys = agent ? [`ap_msg_${agent}_${state}`, `ap_msg_all_${state}`] : [`ap_msg_all_${state}`];
-  for (const k of keys) {
-    const raw = localStorage.getItem(k);
-    if (!raw) continue;
-    const lines = raw.split("\n").map((s) => s.trim()).filter(Boolean);
-    if (!lines.length) continue;
-    let h = 5381;
-    for (const c of seed) h = (Math.imul(h, 33) + c.charCodeAt(0)) | 0;
-    return lines[Math.abs(h) % lines.length];
-  }
-  return null;
 }
 
 // --- pick + load a pet sprite -------------------------------------------------
@@ -135,50 +104,86 @@ function customLine(state: string, seed: string, agent?: string): string | null 
   }
 })();
 
-// --- render loop for state + bubble ------------------------------------------
-let idleUntil = 0; // while in the future, the idle-chatter line owns the bubble
-let lastBubbleHtml = ""; // skip DOM rewrites when nothing changed (no flicker)
-function render() {
-  const active = store.active().filter((s) => s.state !== "idle");
-  pet.setState(active[0]?.state ?? "idle");
+// --- mood + render loop --------------------------------------------------------
+// Port of PetController: aggregate mood, 3s celebrate burst on entering done,
+// a persistent idle line (re-picked on mood transitions, not blinking), and
+// the structured multi-agent bubble while agents are active.
+let lastResolved = "idle";
+let celebrateUntil = 0;
+let wasCelebrating = false;
+let moodLine = ""; // the single-bubble line for idle/done/celebrate
 
-  if (active.length) {
-    idleUntil = 0;
-    // Show every active agent (multi-agent), one row each, capped. Seed the
-    // phrase by session + current tool so the line changes as the agent moves
-    // between tools (like the macOS per-tool phrases).
-    const html = active.slice(0, 4).map((s) => {
-      const label = t(STATE_LABEL[s.state] ?? "");
-      const msg = msgFor(s.state, `${s.session}:${s.tool}`, s.agent, s.message);
-      const proj = s.project ? s.project.split(/[\\/]/).pop() : "";
-      const clock = s.state === "working" || s.state === "waiting" ? elapsed(s.stateSince) : "";
-      return `<div class="brow" data-state="${esc(s.state)}"><span class="dot"></span>` +
-        `<span class="agent">${esc(s.agent)}</span>${proj ? " · " + esc(proj) : ""} ` +
-        `${esc(msg)}${clock ? `<span class="clock">${clock}</span>` : ""}` +
-        `<span class="state">${esc(label)}</span></div>`;
-    }).join("");
-    if (html !== lastBubbleHtml) { bubble.innerHTML = html; lastBubbleHtml = html; }
-    bubble.hidden = false;
-  } else if (Date.now() < idleUntil) {
-    // idle chatter is on screen , don't blink it away on the next tick
-  } else {
-    bubble.hidden = true;
-    lastBubbleHtml = "";
-  }
+function pickMoodLine(mood: string) {
+  const pool = bubbleLines(null, mood);
+  moodLine = pool.length ? pool[Math.floor(Math.random() * pool.length)] : "";
 }
 
-// Live elapsed time in the current state ("12s", "3m08s", "1h04m") , the render
-// loop ticks every 500ms so it counts up like the macOS bubble clock.
-function elapsed(since: number): string {
-  const s = Math.max(0, Math.floor((Date.now() - since) / 1000));
-  if (s < 60) return `${s}s`;
-  if (s < 3600) return `${Math.floor(s / 60)}m${String(s % 60).padStart(2, "0")}s`;
-  return `${Math.floor(s / 3600)}h${String(Math.floor((s % 3600) / 60)).padStart(2, "0")}m`;
+function render() {
+  const sessions = store.active();
+  const resolved = aggregateMood(sessions);
+
+  if (resolved === "done" && lastResolved !== "done") {
+    celebrateUntil = Date.now() + 3000; // celebrate burst, like macOS
+    pickMoodLine("celebrate");
+  }
+  if (resolved !== lastResolved && Date.now() >= celebrateUntil) {
+    if (resolved === "idle") pickMoodLine("idle");
+    else if (resolved === "done") pickMoodLine("done");
+  }
+  lastResolved = resolved;
+
+  const celebrating = Date.now() < celebrateUntil;
+  if (wasCelebrating && !celebrating) {
+    // The 3s burst ended , settle into the actual mood's line (mac
+    // settleAfterCelebrate re-picks on the celebrate→done transition).
+    pickMoodLine(resolved === "idle" ? "idle" : "done");
+  }
+  wasCelebrating = celebrating;
+  const mood = celebrating ? "celebrate" : resolved;
+  pet.setState(mood);
+
+  if (mood === "working" || mood === "waiting") {
+    bubble.render(sessions.filter((s) => s.state !== "idle" && s.state !== "registered"));
+  } else if (mood === "celebrate") {
+    bubble.renderLine(moodLine || t("Done"));
+  } else if (mood === "done") {
+    if (!moodLine) pickMoodLine("done");
+    bubble.renderLine(moodLine);
+  } else {
+    // idle: a persistent quiet line (mac shows it continuously, no blinking)
+    if (localStorage.getItem("ap_idle") !== "0") {
+      if (!moodLine) pickMoodLine("idle");
+      bubble.renderLine(moodLine);
+    } else {
+      bubble.hide();
+    }
+  }
+
+  snugBubble();
+  reportTrayStatus(sessions);
 }
 setInterval(render, 500);
+// Carousel advance / fold clicks request a prompt repaint.
+setInterval(() => { if (bubble.dirty) { bubble.dirty = false; render(); } }, 120);
+// Live elapsed clocks tick every second.
+setInterval(() => bubble.tickClocks(), 1000);
 
-function esc(s: string): string {
-  return s.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c] || c));
+// Pull the bubble down over the canvas's empty headroom so it sits right
+// above the pet's head (the sprite rarely fills the whole canvas height).
+function snugBubble() {
+  const gap = Math.max(0, canvas.clientHeight * pet.headroom - 4);
+  bubbleEl.style.transform = `translateY(${gap}px)`;
+}
+
+// Tray tooltip mirrors the macOS menu bar count (N working / N waiting).
+let lastTray = "";
+function reportTrayStatus(sessions: ReturnType<SessionStore["active"]>) {
+  const working = sessions.filter((s) => s.state === "working").length;
+  const waiting = sessions.filter((s) => s.state === "waiting").length;
+  const sig = `${working}/${waiting}`;
+  if (sig === lastTray) return;
+  lastTray = sig;
+  invoke("set_tray_status", { working, waiting }).catch(() => {});
 }
 
 // --- notifications ------------------------------------------------------------
@@ -187,25 +192,40 @@ let notifyReady = false;
   try { notifyReady = (await isPermissionGranted()) || (await requestPermission()) === "granted"; } catch {}
 })();
 const lastState = new Map<string, string>();
-function maybeNotify(e: { agent: string; session: string; state: string; project: string }) {
+function maybeNotify(e: AgentEventPayload) {
   const key = `${e.agent}:${e.session}`;
   const prev = lastState.get(key);
   lastState.set(key, e.state);
   if (e.state === prev) return;
   if (e.state !== "done" && e.state !== "waiting") return;
-  beep(e.state === "done" ? 880 : 560); // chime (gated by ap_sound)
+  chime(e.state === "done" ? "done" : "waiting");
   if (!notifyReady || localStorage.getItem("ap_notify") === "0") return;
-  const proj = (e.project ? e.project.split(/[\\/]/).pop() : "") || e.agent;
-  const label = t(e.state === "done" ? "Done" : "Needs you");
-  try { sendNotification({ title: `AgentPet , ${label}`, body: `${e.agent} · ${proj}` }); } catch {}
+  const proj = (e.project ? basename(e.project) : "") || e.agent;
+  // Same copy as the macOS notifications.
+  const title = e.state === "done" ? `${proj} ${t("finished")}` : `${proj} ${t("needs input")}`;
+  const body = e.state === "done"
+    ? t("Agent completed its turn")
+    : (e.message || t("Waiting for you"));
+  try { sendNotification({ title, body }); } catch {}
 }
 
 // --- agent events from the Rust listener -------------------------------------
-listen<any>("agent-event", (e) => { maybeNotify(e.payload); store.update(e.payload); render(); });
+listen<AgentEventPayload>("agent-event", (e) => {
+  maybeNotify(e.payload);
+  store.update(e.payload);
+  render();
+});
 listen<string>("agent-end", (e) => {
   for (const k of [...lastState.keys()]) if (k.endsWith(`:${e.payload}`)) lastState.delete(k);
   store.remove(e.payload);
   render();
+});
+// Settings window: dismiss one session / clear all (mac popover actions).
+listen<string>("session-dismiss", (e) => { store.removeKey(e.payload); render(); });
+listen("sessions-clear", () => { store.clear(); render(); });
+// A freshly opened Settings window asks for the current sessions.
+listen("sessions-request", () => {
+  for (const s of store.snapshot()) emit("session-snapshot", s);
 });
 // Pet changed from the Settings window.
 listen<{ slug: string; url: string }>("set-pet", (e) => {
@@ -215,13 +235,16 @@ listen<{ slug: string; url: string }>("set-pet", (e) => {
 // Language changed from Settings , re-render the bubble in the new language.
 listen<Lang>("lang-changed", (e) => { setLang(e.payload); render(); });
 // Bubble theme / opacity / messages changed from Settings.
-listen("bubble-changed", () => { applyBubble(); applyPet(); render(); });
+listen("bubble-changed", () => { applyBubble(); applyPet(); moodLine = ""; render(); });
 
 // --- interactions ------------------------------------------------------------
-// Drag the pet to reposition it. Settings/Quit live in the tray menu (the
-// overlay is frameless, and starting an OS drag here would swallow clicks).
+// Drag the pet to reposition it. Right-click opens Settings (mac: popover).
 canvas.addEventListener("mousedown", async (e) => {
   if (e.button === 0) await getCurrentWindow().startDragging();
+});
+canvas.addEventListener("contextmenu", (e) => {
+  e.preventDefault();
+  invoke("open_settings").catch(() => {});
 });
 
 // Report the pet's opaque rect (physical px) so the rest of the transparent
@@ -237,18 +260,4 @@ new ResizeObserver(reportHitRect).observe(petRoot);
 window.addEventListener("resize", reportHitRect);
 reportHitRect();
 
-// Occasional idle chatter.
-setInterval(() => {
-  if (localStorage.getItem("ap_idle") === "0") return; // idle chatter disabled
-  if (store.topState() === "idle") {
-    const theme = localStorage.getItem("ap_theme_phrases") || "off";
-    bubble.textContent =
-      customLine("idle", "idle") ||
-      (theme !== "off" ? themePhrase(theme, "idle", String(Date.now())) : null) ||
-      t(IDLE_LINES[Math.floor(Date.now() / 1000) % IDLE_LINES.length]);
-    lastBubbleHtml = "";
-    idleUntil = Date.now() + 4000; // keep render() from hiding it mid-display
-    bubble.hidden = false;
-    setTimeout(() => { if (store.topState() === "idle") bubble.hidden = true; }, 4000);
-  }
-}, 30000);
+render();
