@@ -22,6 +22,8 @@ struct MenuContentView: View {
         VStack(spacing: 0) {
             header
             divider
+            careSection
+            divider
             agentSection
             divider
             controls
@@ -59,6 +61,83 @@ struct MenuContentView: View {
         let running = agents.filter { $0.state == .working }.count
         let label = "\(total) agent\(total == 1 ? "" : "s")"
         return running > 0 ? "\(label) · \(running) running" : label
+    }
+
+    // MARK: Companion (care stats)
+
+    @ObservedObject private var care = PetCareController.shared
+    @ObservedObject private var imagePets = ImagePetStore.shared
+
+    private static let stageIcons = ["leaf.fill", "pawprint.fill", "binoculars.fill", "shield.fill", "crown.fill"]
+    private static let stageColors: [Color] = [.green, .teal, .blue, .purple, .orange]
+
+    private var careSection: some View {
+        let state = care.current
+        let level = care.level
+        let idx = min(care.stageIndex, Self.stageColors.count - 1)
+        let color = Self.stageColors[idx]
+        let name = pet.selectedPetID.flatMap { imagePets.pack(id: $0)?.displayName }
+            ?? NSLocalizedString("Your pet", comment: "")
+
+        return VStack(alignment: .leading, spacing: 6) {
+            sectionLabel("Companion")
+            HStack(spacing: 10) {
+                Image(systemName: Self.stageIcons[idx])
+                    .font(.system(size: 14))
+                    .foregroundStyle(color)
+                    .frame(width: 22, height: 22)
+                    .background(Circle().fill(color.opacity(0.18)))
+                Text(name).font(.system(size: 13, weight: .semibold)).foregroundStyle(.white)
+                Text(verbatim: "Lv \(level)")
+                    .font(.system(size: 12, weight: .bold)).foregroundStyle(color)
+                Text(NSLocalizedString(care.stageKey, comment: "stage"))
+                    .font(.system(size: 10, weight: .semibold))
+                    .padding(.horizontal, 6).padding(.vertical, 2)
+                    .background(Capsule().fill(color.opacity(0.2)))
+                    .foregroundStyle(color)
+                Spacer()
+                Text(hungerText)
+                    .font(.system(size: 11)).foregroundStyle(.white.opacity(0.55))
+            }
+            .padding(.horizontal, 14)
+            ProgressView(value: care.levelProgress)
+                .tint(color)
+                .controlSize(.small)
+                .padding(.horizontal, 14)
+            HStack {
+                Text(verbatim: xpLine)
+                Spacer()
+                Text(verbatim: todayLine)
+            }
+            .font(.system(size: 10))
+            .foregroundStyle(.white.opacity(0.45))
+            .padding(.horizontal, 14)
+            .padding(.bottom, 12)
+        }
+    }
+
+    private var xpLine: String {
+        "\(care.current.xp) / \(PetCare.xpToReach(level: care.level + 1)) XP"
+    }
+
+    private var todayLine: String {
+        let tokens = care.current.tokensToday
+        let label = tokens >= 1_000_000 ? String(format: "%.1fM", Double(tokens) / 1_000_000)
+            : tokens >= 1_000 ? String(format: "%.0fk", Double(tokens) / 1_000) : "\(tokens)"
+        return String(
+            format: NSLocalizedString("Today %@ tokens · %d meals", comment: "popover care today line"),
+            label, care.current.mealsToday
+        )
+    }
+
+    private var hungerText: String {
+        switch care.hunger {
+        case .full: return NSLocalizedString("Full", comment: "hunger")
+        case .satisfied: return NSLocalizedString("Satisfied", comment: "hunger")
+        case .peckish: return NSLocalizedString("Peckish", comment: "hunger")
+        case .hungry: return NSLocalizedString("Hungry", comment: "hunger")
+        case .starving: return NSLocalizedString("Starving", comment: "hunger")
+        }
     }
 
     // MARK: Agents
