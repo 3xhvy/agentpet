@@ -363,3 +363,9 @@
 
 /* Privacy clarity */
 "Connecting is optional. Your pet, its level and all stats live on this Mac whether or not you sign in, nothing leaves your machine until you connect." = "Connecting is optional. Your pet, its level and all stats live on this Mac whether or not you sign in, nothing leaves your machine until you connect.";
+
+/* Coffee methods */
+"International" = "International";
+"Việt Nam" = "Vietnam";
+"Opens buymeacoffee.com in your browser." = "Opens buymeacoffee.com in your browser.";
+"Quét bằng app ngân hàng bất kỳ (VPBank · NGUYEN THANH DAT)" = "Scan with any banking app (VPBank · NGUYEN THANH DAT)";

@@ -363,3 +363,9 @@
 
 /* Privacy clarity */
 "Connecting is optional. Your pet, its level and all stats live on this Mac whether or not you sign in, nothing leaves your machine until you connect." = "连接是可选的。无论是否登录，宠物、等级和所有数据都保存在这台 Mac 上；在你连接之前，任何数据都不会离开本机。";
+
+/* Coffee methods */
+"International" = "国际";
+"Việt Nam" = "越南";
+"Opens buymeacoffee.com in your browser." = "在浏览器打开 buymeacoffee.com。";
+"Quét bằng app ngân hàng bất kỳ (VPBank · NGUYEN THANH DAT)" = "用任意银行 App 扫码（VPBank · NGUYEN THANH DAT）";

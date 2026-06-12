@@ -364,3 +364,9 @@
 
 /* Privacy clarity */
 "Connecting is optional. Your pet, its level and all stats live on this Mac whether or not you sign in, nothing leaves your machine until you connect." = "Kết nối là tùy chọn. Pet, cấp độ và mọi số liệu đều nằm trên máy Mac này dù bạn có đăng nhập hay không, không gì rời khỏi máy cho đến khi bạn kết nối.";
+
+/* Coffee methods */
+"International" = "Quốc tế";
+"Việt Nam" = "Việt Nam";
+"Opens buymeacoffee.com in your browser." = "Mở buymeacoffee.com trên trình duyệt.";
+"Quét bằng app ngân hàng bất kỳ (VPBank · NGUYEN THANH DAT)" = "Quét bằng app ngân hàng bất kỳ (VPBank · NGUYEN THANH DAT)";
