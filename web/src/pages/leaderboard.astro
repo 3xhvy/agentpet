@@ -172,7 +172,7 @@ import Hero from "../components/Hero.astro";
               </span>
               <span class="shrink-0 text-right">
                 <span class="block font-display text-base font-bold" style="color:${color}">Lv ${dispLv}</span>
-                <span class="block text-[11px] text-faint">${tokenLabel(p.tokens)} tok</span>
+                <span class="block text-[11px] text-faint">${p.xp.toLocaleString()} XP</span>
               </span>
             </div>`;
         }).join("");
