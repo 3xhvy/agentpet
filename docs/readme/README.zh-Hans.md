@@ -38,11 +38,25 @@
 ## 截图
 
 <div align="center">
-  <img src="../../assets/screenshot-menubar.png" width="360" alt="菜单栏监视器" />
-  <img src="../../assets/screenshot-settings.png" width="360" alt="设置" />
-  <img src="../../assets/screenshot-pet.png" width="360" alt="宠物" />
-  <img src="../../assets/screenshot-notification.png" width="360" alt="通知" />
+  <img src="../../assets/screenshot-hud.png" width="300" alt="右键点击宠物查看状态 HUD：等级、经验、饥饿度、近 7 天消耗和订阅额度" />
+  <p><sub><b>右键点击宠物</b>查看游戏风格的 HUD , 等级、经验、饥饿度、近 7 天消耗图，以及实时的 Claude/Codex 额度。</sub></p>
+</div>
+
+<table align="center">
+  <tr>
+    <td align="center" width="50%"><img src="../../assets/screenshot-menubar.png" width="380" alt="菜单栏监视器" /><br/><sub>菜单栏监视器 , 一眼看清每个智能体</sub></td>
+    <td align="center" width="50%"><img src="../../assets/screenshot-care.png" width="380" alt="养成标签页" /><br/><sub>养成标签页 , 用真实工作养大你的宠物</sub></td>
+  </tr>
+  <tr>
+    <td align="center" width="50%"><img src="../../assets/screenshot-settings.png" width="380" alt="设置" /><br/><sub>原生分页式设置</sub></td>
+    <td align="center" width="50%"><img src="../../assets/screenshot-pet.png" width="380" alt="桌面宠物" /><br/><sub>桌面宠物</sub></td>
+  </tr>
+</table>
+
+<div align="center">
   <br/>
+  <img src="../../assets/screenshot-leaderboard.png" width="660" alt="社区排行榜" />
+  <p><sub>社区<a href="https://agentpet.thenightwatcher.online/leaderboard">排行榜</a> , 按等级、会话或 token 排名。</sub></p>
   <img src="../../assets/demo.gif" width="600" alt="宠物对智能体活动作出反应" />
 </div>
 

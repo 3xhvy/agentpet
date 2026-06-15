@@ -38,11 +38,25 @@
 ## スクリーンショット
 
 <div align="center">
-  <img src="../../assets/screenshot-menubar.png" width="360" alt="メニューバー監視" />
-  <img src="../../assets/screenshot-settings.png" width="360" alt="設定" />
-  <img src="../../assets/screenshot-pet.png" width="360" alt="ペット" />
-  <img src="../../assets/screenshot-notification.png" width="360" alt="通知" />
+  <img src="../../assets/screenshot-hud.png" width="300" alt="ペットを右クリックでステータス HUD：レベル、XP、空腹度、過去7日の消費、サブスク上限" />
+  <p><sub><b>ペットを右クリック</b>でゲーム風 HUD , レベル、XP、空腹度、過去7日の消費グラフ、そして Claude/Codex の上限をリアルタイム表示。</sub></p>
+</div>
+
+<table align="center">
+  <tr>
+    <td align="center" width="50%"><img src="../../assets/screenshot-menubar.png" width="380" alt="メニューバー監視" /><br/><sub>メニューバー監視 , すべてのエージェントを一目で</sub></td>
+    <td align="center" width="50%"><img src="../../assets/screenshot-care.png" width="380" alt="ケアタブ" /><br/><sub>ケアタブ , 実際の作業でペットを育てる</sub></td>
+  </tr>
+  <tr>
+    <td align="center" width="50%"><img src="../../assets/screenshot-settings.png" width="380" alt="設定" /><br/><sub>ネイティブなタブ式設定</sub></td>
+    <td align="center" width="50%"><img src="../../assets/screenshot-pet.png" width="380" alt="デスクトップペット" /><br/><sub>デスクトップペット</sub></td>
+  </tr>
+</table>
+
+<div align="center">
   <br/>
+  <img src="../../assets/screenshot-leaderboard.png" width="660" alt="コミュニティのリーダーボード" />
+  <p><sub>コミュニティの<a href="https://agentpet.thenightwatcher.online/leaderboard">リーダーボード</a> , レベル・セッション・トークン別。</sub></p>
   <img src="../../assets/demo.gif" width="600" alt="エージェントの活動に反応するペット" />
 </div>
 
