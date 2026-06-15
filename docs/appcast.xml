@@ -6,6 +6,14 @@
         <description>Updates for AgentPet</description>
         <language>en</language>
         <item>
+            <title>1.4.2</title>
+            <sparkle:version>1.4.2</sparkle:version>
+            <sparkle:shortVersionString>1.4.2</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
+            <enclosure url="https://github.com/ntd4996/agentpet/releases/download/v1.4.2/AgentPet-1.4.2.dmg"
+                       sparkle:edSignature="QGukW+l2sE92PnXrdJ3wa2BpLz8YgZTYzBqj7MC6ET5dFjKp5FaXWLP3tN1u92OUvt1eP29fAQwjPcBR0M/HCA==" length="4584473" type="application/octet-stream" />
+        </item>
+        <item>
             <title>1.4.1</title>
             <sparkle:version>1.4.1</sparkle:version>
             <sparkle:shortVersionString>1.4.1</sparkle:shortVersionString>
