@@ -1,7 +1,7 @@
 <div align="center">
   <img src="../../assets/banner.png" alt="AgentPet" width="100%" />
   <p>
-    <img src="https://img.shields.io/badge/platform-macOS%2013%2B-black" alt="macOS 13+" />
+    <img src="https://img.shields.io/badge/platform-macOS%2013%2B%20%C2%B7%20Windows%2010%2F11-black" alt="macOS 13+ &middot; Windows 10/11" />
     <img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT" />
     <img src="https://img.shields.io/badge/Swift-SwiftUI-orange" alt="Swift" />
     <a href="https://github.com/ntd4996/agentpet"><img src="https://img.shields.io/github/stars/ntd4996/agentpet?style=social" alt="GitHub stars" /></a>
@@ -50,7 +50,7 @@
 
 - **macOS 13 Ventura 或更高版本**（推荐 macOS 14 Sonoma 及以上；关闭键盘焦点环使用了 macOS 14+ 的 API）。
 - 同时支持 **Apple Silicon（M1/M2/M3/M4）与 Intel Mac**。
-- 按设计仅支持 macOS，没有 Windows 或 Linux 版本。
+- 支持 macOS 13+（Apple Silicon 和 Intel）以及 Windows 10/11（64 位）。Windows 版本位于 `windows/` 目录（Tauri + Rust）。
 - 从源码构建需要：Xcode 16 / Swift 6。
 
 ## 安装

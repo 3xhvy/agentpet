@@ -1,7 +1,7 @@
 <div align="center">
   <img src="assets/banner.png" alt="AgentPet" width="100%" />
   <p>
-    <img src="https://img.shields.io/badge/platform-macOS%2013%2B-black" alt="macOS 13+" />
+    <img src="https://img.shields.io/badge/platform-macOS%2013%2B%20%C2%B7%20Windows%2010%2F11-black" alt="macOS 13+ · Windows 10/11" />
     <img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT" />
     <img src="https://img.shields.io/badge/Swift-SwiftUI-orange" alt="Swift" />
     <a href="https://github.com/ntd4996/agentpet/actions"><img src="https://github.com/ntd4996/agentpet/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
@@ -33,6 +33,9 @@ Running multiple agents in parallel means constantly switching windows to check 
 - **Native notifications** when an agent finishes or needs input.
 - **Claude Code, Codex, Gemini CLI, Cursor, opencode, Windsurf & Antigravity** integration via hooks, with one-tap install from Settings (precise working / waiting / done / idle, including "needs your input"). GLM (Z.AI) works through Claude Code automatically. Cursor, Windsurf and Antigravity report working/done (they have no "needs input" hook).
 - **Universal wrapper** `agentpet run -- <command>` to monitor *any* CLI agent (working/done), no per-agent setup.
+- **Raise your pet (tamagotchi)**: your companion is fed by real work, the tokens your agents burn and the sessions they finish. It earns XP, levels up, and evolves through five stages (Hatchling → Companion → Scout → Hero → Legend). Every pet keeps its own level.
+- **Stats HUD**: right-click the pet for a game-style card, level, XP, hunger, a 7-day burn chart, and your live **Claude / Codex subscription limits read directly from your sign-ins** (no extra app needed).
+- **Web profile & leaderboard**: optionally sign in with GitHub to show your companions at [agentpet.thenightwatcher.online](https://agentpet.thenightwatcher.online/profile) and climb the community [leaderboard](https://agentpet.thenightwatcher.online/leaderboard) (by level, sessions, or tokens). Fully optional, everything works offline if you never connect.
 - **Pet system**: browse an online pet library and download with one click, map each animation to a state, resize, and customise chat lines.
 - **Polished, native Settings** (tabbed, dark) that never steals focus.
 
@@ -42,31 +45,35 @@ Running multiple agents in parallel means constantly switching windows to check 
   <img src="assets/screenshot-menubar.png" width="360" alt="Menu bar monitor" />
   <img src="assets/screenshot-settings.png" width="360" alt="Settings" />
   <img src="assets/screenshot-pet.png" width="360" alt="Pet" />
-  <img src="assets/screenshot-notification.png" width="360" alt="Notification" />
+  <img src="assets/screenshot-care.png" width="360" alt="Pet care: level, XP and subscription limits" />
+  <br/>
+  <img src="assets/screenshot-leaderboard.png" width="600" alt="Community leaderboard of raised companions" />
   <br/>
   <img src="assets/demo.gif" width="600" alt="Pet reacting to agent activity" />
 </div>
 
 ## Requirements
 
-- **macOS 13 Ventura or later** (macOS 14 Sonoma+ recommended; the keyboard-focus-ring cleanup uses APIs available on macOS 14+).
-- **Apple Silicon (M1/M2/M3/M4) and Intel Macs** are both supported.
-- macOS only, by design. There is no Windows or Linux version.
-- To build from source: Xcode 16 / Swift 6.
+- **macOS 13 Ventura or later** (macOS 14 Sonoma+ recommended; Apple Silicon and Intel both supported), or **Windows 10 / 11 (64-bit)**.
+- To build the macOS app from source: Xcode 16 / Swift 6. The Windows app lives under [`windows/`](windows/) (Tauri + Rust).
 
 ## Install
 
-### Homebrew
+### macOS , Homebrew
 
 ```bash
 brew install --cask ntd4996/tap/agentpet
 ```
 
-### Direct download
+### macOS , direct download
 
-Grab the latest `AgentPet.dmg` from [Releases](https://github.com/ntd4996/agentpet/releases), open it, and drag AgentPet to Applications.
+Grab the latest `AgentPet.dmg` from [Releases](https://github.com/ntd4996/agentpet/releases/latest), open it, and drag AgentPet to Applications.
 
-### Build from source
+### Windows
+
+Download the latest installer or portable build from the [website](https://agentpet.thenightwatcher.online/install) or the [`win-` releases](https://github.com/ntd4996/agentpet/releases). The first launch may show a SmartScreen warning (the early Windows build isn't code-signed yet), click **More info → Run anyway**. It installs per-user (no admin) and auto-updates.
+
+### Build from source (macOS)
 
 ```bash
 git clone https://github.com/ntd4996/agentpet.git
@@ -75,7 +82,7 @@ cd agentpet
 open build/AgentPet.app
 ```
 
-Builds are Developer ID-signed and notarized by Apple, so they open without a Gatekeeper warning. AgentPet also updates itself: it checks for new versions automatically, and you can update in-app from the menu bar **Updates** button.
+macOS builds are Developer ID-signed and notarized by Apple, so they open without a Gatekeeper warning. AgentPet also updates itself: it checks for new versions automatically, and you can update in-app from the menu bar **Updates** button.
 
 On first launch, open **Settings → General** and click **Install** next to Claude Code, then **Enable** notifications.
 

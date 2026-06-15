@@ -1,7 +1,7 @@
 <div align="center">
   <img src="../../assets/banner.png" alt="AgentPet" width="100%" />
   <p>
-    <img src="https://img.shields.io/badge/platform-macOS%2013%2B-black" alt="macOS 13+" />
+    <img src="https://img.shields.io/badge/platform-macOS%2013%2B%20%C2%B7%20Windows%2010%2F11-black" alt="macOS 13+ &middot; Windows 10/11" />
     <img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT" />
     <img src="https://img.shields.io/badge/Swift-SwiftUI-orange" alt="Swift" />
     <a href="https://github.com/ntd4996/agentpet"><img src="https://img.shields.io/github/stars/ntd4996/agentpet?style=social" alt="GitHub stars" /></a>
@@ -50,7 +50,7 @@
 
 - **macOS 13 Ventura 以降**（macOS 14 Sonoma 以降を推奨。キーボードのフォーカスリング無効化に macOS 14+ の API を使用）。
 - **Apple Silicon（M1/M2/M3/M4）と Intel Mac** の両方に対応。
-- 設計上 macOS 専用です。Windows / Linux 版はありません。
+- macOS 13+（Apple Silicon / Intel）および Windows 10/11（64ビット）に対応。Windows 版は `windows/` ディレクトリ（Tauri + Rust）にあります。
 - ソースからビルドするには: Xcode 16 / Swift 6。
 
 ## インストール

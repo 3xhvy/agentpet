@@ -1,7 +1,7 @@
 <div align="center">
   <img src="../../assets/banner.png" alt="AgentPet" width="100%" />
   <p>
-    <img src="https://img.shields.io/badge/platform-macOS%2013%2B-black" alt="macOS 13+" />
+    <img src="https://img.shields.io/badge/platform-macOS%2013%2B%20%C2%B7%20Windows%2010%2F11-black" alt="macOS 13+ &middot; Windows 10/11" />
     <img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT" />
     <img src="https://img.shields.io/badge/Swift-SwiftUI-orange" alt="Swift" />
     <a href="https://github.com/ntd4996/agentpet"><img src="https://img.shields.io/github/stars/ntd4996/agentpet?style=social" alt="GitHub stars" /></a>
@@ -50,7 +50,7 @@ Chạy nhiều agent song song nghĩa là phải liên tục đổi cửa sổ �
 
 - **macOS 13 Ventura trở lên** (khuyến nghị macOS 14 Sonoma trở lên; phần tắt focus ring dùng API có từ macOS 14+).
 - Hỗ trợ cả **Mac Apple Silicon (M1/M2/M3/M4) và Mac Intel**.
-- Chỉ chạy trên macOS theo thiết kế. Không có bản Windows hay Linux.
+- Hỗ trợ macOS 13+ (Apple Silicon & Intel) và Windows 10/11 (64-bit). Bản Windows ở thư mục `windows/` (Tauri + Rust).
 - Để build từ mã nguồn: Xcode 16 / Swift 6.
 
 ## Cài đặt
